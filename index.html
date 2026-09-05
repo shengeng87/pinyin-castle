@@ -1,0 +1,1738 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>拼音城堡</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&family=Noto+Sans+SC:wght@500;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --ink: #2a3a4a;
+      --shengmu: #e86a3c;
+      --yunmu: #2a9d8f;
+      --zhengti: #e9a825;
+      font-family: "Noto Sans SC", "Microsoft YaHei", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      background: #1a2836;
+      overflow: hidden;
+      touch-action: manipulation;
+      user-select: none;
+    }
+
+    .stage {
+      position: relative;
+      width: min(100vw, 960px);
+      height: 100dvh;
+      min-height: 560px;
+      margin: 0 auto;
+      overflow: hidden;
+      background: #7ec8ff;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .hud {
+      position: absolute;
+      inset: max(12px, env(safe-area-inset-top)) 12px auto 12px;
+      z-index: 5;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 10px;
+      pointer-events: none;
+    }
+
+    .day-badge {
+      min-width: 88px;
+      padding: 10px 14px;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.9);
+      text-align: center;
+    }
+
+    .day-badge span {
+      display: block;
+      font-size: 12px;
+      font-weight: 700;
+      color: rgba(42, 58, 74, 0.65);
+    }
+
+    .day-badge strong {
+      display: block;
+      margin-top: 2px;
+      font-family: "ZCOOL KuaiLe", cursive;
+      font-size: clamp(22px, 5vw, 30px);
+      font-weight: 400;
+      line-height: 1.1;
+    }
+
+    .story {
+      flex: 1;
+      max-width: 420px;
+      margin: 0 auto;
+      padding: 10px 16px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.9);
+      text-align: center;
+    }
+
+    .story .brand {
+      font-family: "ZCOOL KuaiLe", cursive;
+      font-size: clamp(18px, 4vw, 24px);
+    }
+
+    .story p {
+      margin: 6px 0 0;
+      font-size: clamp(13px, 3.2vw, 15px);
+      font-weight: 700;
+      line-height: 1.45;
+      color: rgba(42, 58, 74, 0.82);
+    }
+
+    .story .tag {
+      display: inline-block;
+      margin-top: 8px;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .story .tag.shengmu { background: var(--shengmu); }
+    .story .tag.yunmu { background: var(--yunmu); }
+    .story .tag.zhengti { background: var(--zhengti); }
+
+    .hint {
+      position: absolute;
+      left: 50%;
+      bottom: max(16px, env(safe-area-inset-bottom));
+      transform: translateX(-50%);
+      z-index: 5;
+      padding: 8px 16px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.88);
+      font-size: 13px;
+      font-weight: 700;
+      color: rgba(42, 58, 74, 0.7);
+      cursor: pointer;
+      pointer-events: auto;
+      border: none;
+      font-family: inherit;
+    }
+
+    .hint:active {
+      transform: translateX(-50%) scale(0.97);
+    }
+
+    .hint[hidden] {
+      display: none;
+    }
+
+    /* 云朵问答 */
+    .quiz {
+      position: absolute;
+      left: 50%;
+      top: 42%;
+      transform: translate(-50%, -50%) scale(0.92);
+      z-index: 8;
+      width: min(92vw, 420px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease, transform 0.25s ease;
+    }
+
+    .quiz.show {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translate(-50%, -50%) scale(1);
+    }
+
+    .cloud {
+      position: relative;
+      padding: 22px 20px 18px;
+      border-radius: 28px;
+      background: #fff;
+      border: 3px solid rgba(42, 58, 74, 0.08);
+    }
+
+    .cloud::after {
+      content: "";
+      position: absolute;
+      left: 28%;
+      bottom: -16px;
+      width: 28px;
+      height: 28px;
+      background: #fff;
+      border-radius: 50%;
+      box-shadow: 22px 8px 0 #fff, 40px 4px 0 #fff;
+    }
+
+    .cloud .pair {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 12px;
+      font-family: "ZCOOL KuaiLe", cursive;
+      font-size: clamp(28px, 8vw, 40px);
+    }
+
+    .cloud .chip {
+      min-width: 64px;
+      padding: 8px 14px;
+      border-radius: 16px;
+      color: #fff;
+      text-align: center;
+    }
+
+    .cloud .chip.sm { background: var(--shengmu); }
+    .cloud .chip.ym { background: var(--yunmu); }
+
+    .cloud .plus {
+      font-size: 22px;
+      color: rgba(42, 58, 74, 0.45);
+    }
+
+    .cloud .ask {
+      margin: 0;
+      text-align: center;
+      font-size: clamp(15px, 4vw, 18px);
+      font-weight: 700;
+      line-height: 1.45;
+    }
+
+    .cloud .feedback {
+      min-height: 22px;
+      margin: 10px 0 0;
+      text-align: center;
+      font-size: 14px;
+      font-weight: 700;
+      color: #2a9d8f;
+    }
+
+    .cloud .feedback.bad { color: #d4553a; }
+    .cloud .feedback.hint { color: #c47a12; }
+
+    .answers {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .answers.medial-pick {
+      grid-template-columns: repeat(3, 1fr);
+    }
+
+    .answers button {
+      padding: 14px 10px;
+      border: 3px solid rgba(42, 58, 74, 0.1);
+      border-radius: 18px;
+      background: #fff8e8;
+      color: var(--ink);
+      font-family: inherit;
+      font-size: clamp(15px, 4vw, 17px);
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .answers.medial-pick button {
+      font-family: "ZCOOL KuaiLe", cursive;
+      font-size: clamp(22px, 6vw, 30px);
+      font-weight: 400;
+      background: #e8f7f4;
+    }
+
+    .answers button:active {
+      transform: scale(0.97);
+    }
+
+    .answers button.correct-flash {
+      background: #d4f5e4;
+      border-color: #2dc66d;
+    }
+
+    .answers button.wrong-flash {
+      background: #ffe0d8;
+      border-color: #f04b4b;
+    }
+
+    .answers button:disabled {
+      opacity: 0.7;
+      cursor: default;
+    }
+
+    .chip.jm {
+      background: #5b7cfa;
+    }
+
+    .quiz-panel[hidden] {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+  <div class="stage" id="stage">
+    <div class="hud">
+      <div class="day-badge">
+        <span>城堡的第</span>
+        <strong id="dayNum">1</strong>
+        <span>天</span>
+      </div>
+      <div class="story">
+        <div class="brand">拼音城堡</div>
+        <p id="storyText">太阳快要升起了……</p>
+        <span class="tag zhengti" id="familyTag" hidden></span>
+      </div>
+      <div class="day-badge" style="min-width:72px">
+        <span>今日主角</span>
+        <strong id="starText">?</strong>
+      </div>
+    </div>
+
+    <canvas id="scene"></canvas>
+
+    <div class="quiz" id="quiz" aria-live="polite">
+      <div class="cloud">
+        <!-- 第一问：能不能一起玩 -->
+        <div class="quiz-panel" id="panelCan">
+          <div class="pair">
+            <span class="chip sm" id="quizSm">b</span>
+            <span class="plus">+</span>
+            <span class="chip ym" id="quizYm">a</span>
+          </div>
+          <p class="ask">这个声母和韵母可以在一起玩吗？</p>
+          <p class="feedback" id="quizFeedback"></p>
+          <div class="answers" id="answersCan">
+            <button type="button" data-answer="ok">可以</button>
+            <button type="button" data-answer="no">不可以</button>
+            <button type="button" data-answer="medial">需要介母</button>
+            <button type="button" data-answer="zhengti">整体认读</button>
+          </div>
+        </div>
+        <!-- 第二问：选哪个介母 -->
+        <div class="quiz-panel" id="panelMedial" hidden>
+          <div class="pair">
+            <span class="chip sm" id="medSm">j</span>
+            <span class="plus">+</span>
+            <span class="chip jm">?</span>
+            <span class="plus">+</span>
+            <span class="chip ym" id="medYm">a</span>
+          </div>
+            <p class="ask" id="medAsk">请一个介母来牵手吧！选哪一个？</p>
+          <p class="feedback" id="medFeedback"></p>
+          <div class="answers medial-pick" id="answersMedial">
+            <button type="button" data-medial="i">i</button>
+            <button type="button" data-medial="u">u</button>
+            <button type="button" data-medial="ü">ü</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <button class="hint" id="nextBtn" type="button">点这里 · 让日子往前走一天</button>
+  </div>
+
+  <script>
+    const SHENGMU = [
+      "b","p","m","f","d","t","n","l","g","k","h","j","q","x",
+      "zh","ch","sh","r","z","c","s","y","w",
+    ];
+    const YUNMU = [
+      "a","o","e","i","u","ü","ai","ei","ui","ao","ou","iu","ie","üe","er",
+      "an","en","in","un","ün","ang","eng","ing","ong",
+    ];
+    const ZHENGTI = [
+      "zhi","chi","shi","ri","zi","ci","si","yi","wu","yu",
+      "ye","yue","yuan","yin","yun","ying",
+    ];
+
+    // 整体认读 = 看起来像声母+韵母，但不能拼读，要整体认
+    const ZHENGTI_PAIRS = [
+      ["zh", "i", "zhi"], ["ch", "i", "chi"], ["sh", "i", "shi"], ["r", "i", "ri"],
+      ["z", "i", "zi"], ["c", "i", "ci"], ["s", "i", "si"],
+      ["y", "i", "yi"], ["w", "u", "wu"], ["y", "ü", "yu"],
+      ["y", "e", "ye"], ["y", "üe", "yue"], ["y", "üan", "yuan"],
+      ["y", "in", "yin"], ["y", "ün", "yun"], ["y", "ing", "ying"],
+    ];
+
+    const ZHENGTI_KEY = new Map(ZHENGTI_PAIRS.map(([sm, ym, syl]) => [`${sm}+${ym}`, syl]));
+
+    // 两拼：声母 + 韵母 能直接组成音节
+    const TWO = {
+      b: ["a","ai","ao","an","ang","ei","en","eng","i","ie","in","ing","o","u"],
+      p: ["a","ai","ao","an","ang","ei","en","eng","i","ie","in","ing","o","ou","u"],
+      m: ["a","ai","ao","an","ang","e","ei","en","eng","i","ie","in","ing","iu","o","ou","u"],
+      f: ["a","an","ang","ei","en","eng","o","ou","u"],
+      d: ["a","ai","ao","an","ang","e","ei","en","eng","i","ie","ing","iu","ong","ou","u","ui","un"],
+      t: ["a","ai","ao","an","ang","e","ei","en","eng","i","ie","ing","ong","ou","u","ui","un"],
+      n: ["a","ai","ao","an","ang","e","ei","en","eng","i","ie","in","ing","iu","ong","ou","u","ü","üe","ün"],
+      l: ["a","ai","ao","an","ang","e","ei","eng","i","ie","in","ing","iu","ong","ou","u","ü","üe","ün","un"],
+      g: ["a","ai","ao","an","ang","e","ei","en","eng","ong","ou","u","ui","un"],
+      k: ["a","ai","ao","an","ang","e","ei","en","eng","ong","ou","u","ui","un"],
+      h: ["a","ai","ao","an","ang","e","ei","en","eng","ong","ou","u","ui","un"],
+      j: ["i","ia","ie","in","ing","iu","ü","üe","ün"],
+      q: ["i","ia","ie","in","ing","iu","ü","üe","ün"],
+      x: ["i","ia","ie","in","ing","iu","ü","üe","ün"],
+      zh: ["a","ai","ao","an","ang","e","ei","en","eng","i","ong","ou","u","ui","un"],
+      ch: ["a","ai","ao","an","ang","e","en","eng","i","ong","ou","u","ui","un"],
+      sh: ["a","ai","ao","an","ang","e","ei","en","eng","i","ou","u","ui","un"],
+      r: ["an","ang","e","en","eng","i","ong","ou","u","ui","un"],
+      z: ["a","ai","ao","an","ang","e","ei","en","eng","i","ong","ou","u","ui","un"],
+      c: ["a","ai","ao","an","ang","e","en","eng","i","ong","ou","u","ui","un"],
+      s: ["a","ai","ao","an","ang","e","en","eng","i","ong","ou","u","ui","un"],
+      y: ["a","ao","an","ang","e","i","in","ing","ong","ou","u","ü","üe","ün"],
+      w: ["a","ai","an","ang","ei","en","eng","o","u"],
+    };
+
+    // 三拼：声母 + 介母 + 韵母（韵母取基本韵母表中的后段）
+    // 格式：sm -> { 介母: [韵母, ...] }
+    const THREE = {
+      b: { i: ["a","ao","an","ang"] },
+      p: { i: ["a","ao","an","ang"] },
+      m: { i: ["a","ao","an","ang"] },
+      d: { i: ["a","ao","an","ang"], u: ["o","an","ai"] },
+      t: { i: ["a","ao","an","ang"], u: ["o","an","ai"] },
+      n: { i: ["a","ao","an","ang"], u: ["o","an"], ü: ["e"] },
+      l: { i: ["a","ao","an","ang"], u: ["o","an"], ü: ["e"] },
+      g: { u: ["a","o","ai","an","ang"] },
+      k: { u: ["a","o","ai","an","ang"] },
+      h: { u: ["a","o","ai","an","ang"] },
+      j: { i: ["a","ao","an","ang","ong"], ü: ["e","an"] },
+      q: { i: ["a","ao","an","ang","ong"], ü: ["e","an"] },
+      x: { i: ["a","ao","an","ang","ong"], ü: ["e","an"] },
+      zh: { u: ["a","o","ai","an","ang"] },
+      ch: { u: ["a","o","ai","an","ang"] },
+      sh: { u: ["a","o","ai","an","ang"] },
+      r: { u: ["o","an"] },
+      z: { u: ["o","an"] },
+      c: { u: ["o","an"] },
+      s: { u: ["o","an"] },
+    };
+
+    const FAMILY = {
+      shengmu: { id: "shengmu", name: "声母家族", color: "#e86a3c", soft: "#ffb089", label: "声母" },
+      yunmu: { id: "yunmu", name: "韵母家族", color: "#2a9d8f", soft: "#7ed6cb", label: "韵母" },
+      zhengti: { id: "zhengti", name: "整体认读家族", color: "#e9a825", soft: "#ffe08a", label: "整体认读" },
+    };
+
+    const ANSWER_LABEL = { ok: "可以", medial: "需要介母", no: "不可以", zhengti: "整体认读" };
+    const JIEMU_COLOR = "#5b7cfa";
+
+    const canvas = document.getElementById("scene");
+    const ctx = canvas.getContext("2d");
+    const stage = document.getElementById("stage");
+    const dayNumEl = document.getElementById("dayNum");
+    const storyTextEl = document.getElementById("storyText");
+    const starTextEl = document.getElementById("starText");
+    const familyTagEl = document.getElementById("familyTag");
+    const nextBtn = document.getElementById("nextBtn");
+    const quizEl = document.getElementById("quiz");
+    const panelCan = document.getElementById("panelCan");
+    const panelMedial = document.getElementById("panelMedial");
+    const quizSmEl = document.getElementById("quizSm");
+    const quizYmEl = document.getElementById("quizYm");
+    const quizFeedbackEl = document.getElementById("quizFeedback");
+    const medSmEl = document.getElementById("medSm");
+    const medYmEl = document.getElementById("medYm");
+    const medFeedbackEl = document.getElementById("medFeedback");
+    const answerBtns = [...document.querySelectorAll("#answersCan [data-answer]")];
+    const medialBtns = [...document.querySelectorAll("#answersMedial [data-medial]")];
+
+    let W = 0;
+    let H = 0;
+    let t0 = performance.now();
+
+    const DAY_MS = 16000;
+    let dayIndex = 1;
+    let dayStart = performance.now();
+    let dayProgress = 0;
+    let dayPaused = false;
+    let pauseAt = 0;
+    let advancing = false;
+
+    let today = null;
+    let actors = [];
+    let quizOpen = false;
+    let quizStage = "can"; // can | medial
+    let quizSolved = false;
+    /** null=未定, duo=两人玩, trio=三人玩, zhengti=整体认读自己玩, none=不能玩 */
+    let playMode = null;
+    let hornSpeaking = false;
+    let hornToneIndex = -1; // 0..3
+    let hornTonedForms = [];
+    let hornHanziForms = [];
+    let hornTimer = 0;
+    let hornPulse = 0;
+    let hornAudio = null;
+
+    function pick(arr) {
+      return arr[Math.floor(Math.random() * arr.length)];
+    }
+
+    // —— 声调：给拼音标调，喇叭读四声 ——
+    const TONE_VOWELS = {
+      a: ["ā", "á", "ǎ", "à"],
+      o: ["ō", "ó", "ǒ", "ò"],
+      e: ["ē", "é", "ě", "è"],
+      i: ["ī", "í", "ǐ", "ì"],
+      u: ["ū", "ú", "ǔ", "ù"],
+      ü: ["ǖ", "ǘ", "ǚ", "ǜ"],
+      v: ["ǖ", "ǘ", "ǚ", "ǜ"],
+    };
+    const TONE_NAMES = ["一声", "二声", "三声", "四声"];
+
+    const TONE_CHARS = {"di":["低","敌","底","地"],"yi":["一","移","以","意"],"shi":["诗","时","史","是"],"ti":["踢","题","体","替"],"bu":["逋","醭","补","不"],"fou":["不","垺","否",""],"fu":["夫","服","府","父"],"liao":["撩","聊","了","料"],"zai":["灾","","宰","在"],"ren":["","人","忍","认"],"you":["优","油","有","又"],"wei":["威","围","伟","位"],"wo":["窝","","我","握"],"ta":["他","","塔","踏"],"tuo":["托","驼","妥","拓"],"zhe":["遮","折","者","这"],"zhei":["","","","这"],"ge":["哥","格","葛","个"],"gan":["甘","","赶","干"],"men":["闷","门","","闷"],"zhong":["中","","种","众"],"lai":["","来","","赖"],"shang":["伤","","赏","上"],"da":["搭","达","打","大"],"dai":["呆","","歹","带"],"tai":["胎","台","呔","太"],"he":["喝","河","","贺"],"hu":["呼","胡","虎","户"],"huo":["豁","活","火","货"],"guo":["锅","国","果","过"],"dao":["刀","叨","导","到"],"si":["司","","死","四"],"shuo":["说","杓","","硕"],"shui":["","谁","水","睡"],"yue":["约","","","月"],"yao":["腰","摇","咬","要"],"jiu":["纠","","九","就"],"chu":["出","除","楚","处"],"hui":["灰","回","毁","会"],"kuai":["","","擓","快"],"ke":["科","咳","可","课"],"ye":["耶","爷","野","页"],"ni":["妮","泥","你","逆"],"dui":["堆","","啍","对"],"sheng":["升","渑","省","胜"],"neng":["","能","螚",""],"nai":["","","乃","耐"],"xiong":["兄","雄","昫","夐"],"er":["","儿","耳","二"],"zi":["资","","子","字"],"na":["那","拿","哪","纳"],"nuo":["","挪","媠","诺"],"nei":["","","馁","内"],"ne":["","那","","那"],"de":["嘚","得","",""],"dei":["","","得",""],"yu":["迂","鱼","雨","玉"],"xu":["需","邪","许","续"],"zhao":["招","着","找","照"],"zhuo":["桌","着","",""],"xia":["瞎","侠","","下"],"zhi":["知","直","只","至"],"zhu":["朱","竹","主","住"],"nian":["蔫","年","碾","念"],"ning":["","宁","拧","宁"],"fa":["发","罚","法","发"],"hou":["呴","喉","吼","后"],"zuo":["作","昨","左","做"],"li":["哩","离","里","力"],"yong":["拥","喁","永","用"],"xing":["星","行","醒","姓"],"hang":["夯","航","狠","行"],"heng":["哼","横","","横"],"suo":["缩","","所",""],"ran":["","然","染",""],"jia":["家","夹","甲","价"],"gu":["姑","骨","古","故"],"chong":["冲","虫","宠","冲"],"mei":["","没","美","妹"],"cheng":["称","成","裎","秤"],"fang":["方","房","访","放"],"pang":["乓","旁","膀","胖"],"wang":["汪","王","往","忘"],"feng":["风","逢","讽","奉"],"duo":["多","夺","朵","剁"],"jing":["京","","井","净"],"mo":["摸","模","抹","末"],"qu":["区","渠","取","去"],"xue":["削","学","雪","血"],"ru":["","如","乳","入"],"dou":["都","","斗","豆"],"du":["督","毒","赌","度"],"tong":["通","同","统","痛"],"xian":["先","闲","显","现"],"dang":["当","","党","荡"],"dong":["东","","懂","动"],"mian":["","棉","免","面"],"qi":["七","其","起","气"],"kan":["刊","","砍","看"],"ding":["丁","","顶","定"],"tian":["天","田","舔","蚺"],"fen":["分","坟","粉","份"],"hai":["咳","还","海","害"],"huan":["欢","还","缓","换"],"jin":["斤","","尽","进"],"hao":["蒿","毫","好","号"],"xiao":["消","胶","小","笑"],"pou":["剖","涪","部","踣"],"ji":["机","急","挤","计"],"xie":["些","斜","写","谢"],"yang":["央","羊","养","样"],"xin":["心","寻","伈","信"],"jie":["街","节","姐","借"],"chi":["吃","持","尺","赤"],"ben":["奔","","本","笨"],"qian":["千","前","浅","欠"],"jian":["间","","简","见"],"kai":["开","","凯","忾"],"dan":["单","","胆","但"],"tan":["摊","谈","坦","探"],"yan":["烟","言","眼","验"],"yin":["音","银","引","印"],"cong":["聪","从","","憁"],"zong":["宗","","总","纵"],"xiang":["香","详","想","向"],"ri":["","","","日"],"jun":["军","","","俊"],"wu":["乌","无","五","物"],"zhang":["张","","掌","丈"],"chang":["昌","长","场","唱"],"ba":["八","拔","把","爸"],"pa":["趴","爬","","怕"],"min":["","民","眠",""],"gong":["工","","共","共"],"ci":["疵","词","此","次"],"qing":["清","情","请","庆"],"ming":["","明","皿","命"],"meng":["蒙","盟","猛","梦"],"quan":["圈","全","绻","劝"],"san":["三","","伞","散"],"guan":["关","","管","果"],"dian":["颠","","点","电"],"zheng":["争","","整","正"],"wai":["歪","","歪","外"],"jiang":["江","","讲","降"],"qiang":["枪","强","抢","呛"],"liang":["","良","两","亮"],"gao":["高","","搞","告"],"wen":["温","文","稳","问"],"hen":["噷","痕","很","恨"],"zui":["堆","","咀","最"],"cuo":["搓","瘥","搓","错"],"bing":["冰","","饼","病"],"shou":["收","熟","手","受"],"ying":["英","营","影","硬"],"zhan":["沾","讝","展","站"],"tou":["偷","头","妵","透"],"cui":["催","","璀","脆"],"bei":["杯","","北","被"],"bi":["逼","鼻","比","闭"],"pi":["批","皮","匹","屁"],"shen":["身","神","审","甚"],"deng":["灯","","等","凳"],"chan":["搀","缠","产","颤"],"juan":["捐","","卷","倦"],"luo":["啰","罗","裸","落"],"xi":["西","习","洗","细"],"hua":["花","华","","画"],"te":["","","","特"],"rui":["","婑","蕊","瑞"],"biao":["标","","表","鳔"],"lao":["捞","劳","老","烙"],"gei":["","","给",""],"zhai":["侧","度","窄","柴"],"lin":["拎","林","磷","任"],"jiao":["交","矫","脚","叫"],"rong":["茸","容","隔","縙"],"a":["阿","啊","啊","啊"],"e":["","额","恶","饿"],"ha":["哈","蛤","哈","哈"],"ang":["肮","昂","","盎"],"sha":["沙","啥","傻","煞"],"o":["喔","哦","","哦"],"ao":["凹","熬","袄","傲"],"ai":["哀","癌","矮","爱"],"en":["恩","","","摁"],"eng":["鞥","","",""],"nuan":["","濡","暖","餪"],"xuan":["宣","旋","选","炫"],"an":["安","","俺","按"],"han":["酣","寒","喊","汉"],"gang":["刚","","港","杠"],"yun":["晕","云","允","运"],"niu":["妞","牛","扭","拗"],"ou":["欧","","偶","怄"],"bo":["波","伯","跛","薄"],"bie":["憋","别","瘪","别"],"po":["坡","婆","叵","破"],"pei":["胚","陪","俖","配"],"fei":["飞","肥","匪","费"],"bai":["掰","白","百","败"],"ban":["班","","板","半"],"pan":["潘","盘","坢","判"],"su":["苏","俗","","素"],"bang":["帮","","榜","棒"],"beng":["崩","甭","绷","蹦"],"peng":["烹","朋","捧","碰"],"bin":["浜","","","鬓"],"bao":["包","雹","宝","报"],"pao":["抛","袍","跑","炮"],"pu":["扑","葡","普","铺"],"chuo":["戳","","","绰"],"pie":["撇","","苤",""],"mi":["眯","迷","米","密"],"pin":["拼","贫","品","匕"],"bian":["边","","扁","变"],"pian":["偏","便","谝","片"],"piao":["飘","嫖","瞟","票"],"ca":["擦","","",""],"cai":["猜","才","彩","菜"],"kui":["亏","葵","傀","愧"],"sa":["撒","","洒","萨"],"can":["参","残","惨","灿"],"cen":["参","岑","",""],"sun":["孙","","损","摌"],"shan":["山","","闪","善"],"cang":["仓","藏","蒼","賶"],"zang":["赃","","驵","葬"],"lun":["抡","轮","埨","论"],"cao":["操","曹","草","漕"],"zao":["糟","凿","早","造"],"ce":["","","","册"],"zha":["扎","闸","眨","炸"],"ze":["","则","","仄"],"ceng":["噌","层","","蹭"],"zeng":["增","","鬷","赠"],"cha":["插","茶","衩","岔"],"chai":["差","查","茝","差"],"che":["车","","扯","彻"],"chao":["超","朝","炒","超"],"tiao":["挑","条","窕","跳"],"miao":["喵","苗","秒","妙"],"ju":["居","局","举","句"],"chen":["嗔","陈","堪","衬"],"zhen":["真","","诊","镇"],"lan":["","蓝","懒","烂"],"ping":["乒","平","頩","聘"],"chou":["抽","仇","丑","臭"],"qiu":["秋","求","糗","愀"],"qiao":["敲","桥","巧","俏"],"lu":["噜","炉","鲁","路"],"shu":["书","熟","鼠","树"],"chuai":["揣","腄","揣","踹"],"zhui":["追","","沝","坠"],"tuan":["湍","揣","痪","税"],"shuan":["栓","","","涮"],"duan":["端","","短","踹"],"chuan":["穿","船","喘","串"],"yuan":["冤","元","远","院"],"zhuan":["专","","转","赚"],"chuang":["窗","床","闯","创"],"zhuang":["装","","奘","撞"],"chui":["吹","垂","","吹"],"chun":["春","纯","春",""],"zhun":["淳","","准","旽"],"shuang":["双","","爽","淙"],"cou":["楱","","趣","凑"],"cu":["粗","殂","皻","促"],"zu":["租","足","组",""],"cuan":["蹿","蹲","","窜"],"sui":["虽","随","髓","岁"],"za":["扎","杂","咋","喒"],"cun":["村","存","寸","寸"],"zuan":["钻","","纂","攥"],"chua":["","","",""],"diao":["刁","","鸟","调"],"tao":["涛","逃","讨","套"],"tui":["推","弟","腿","退"],"die":["爹","叠","哆",""],"tu":["突","图","土","兔"],"tie":["贴","","铁","帖"],"she":["奢","蛇","舍","社"],"qie":["切","伽","且","窃"],"liu":["溜","留","柳","六"],"dun":["吨","","盹","顿"],"tun":["吞","屯","吨","褪"],"zun":["尊","蹲","撙","拵"],"qun":["遁","群","蹲",""],"shun":["","","盾","俊"],"xun":["熏","寻","","训"],"ei":["欸","诶","欸","欸"],"reng":["扔","仍","","扔"],"fan":["翻","凡","反","饭"],"pai":["拍","排","排","派"],"kang":["康","扛","奋","抗"],"pen":["喷","盆","呠","吩"],"fo":["","佛","",""],"ga":["嘎","嘎","嘎","尬"],"gai":["该","","改","盖"],"gui":["归","","鬼","贵"],"kao":["尻","","考","靠"],"ka":["喀","","卡",""],"gen":["根","哏","艮",""],"n":["","哽","嗯","哏"],"geng":["耕","","耿","更"],"lang":["啷","狼","朗","浪"],"ng":["","哽","嗯","嗯"],"hong":["轰","红","哄","哄"],"gou":["沟","","狗","够"],"kou":["彀","","口","扣"],"jue":["撅","决","蹶","倔"],"gua":["瓜","","寡","挂"],"guai":["乖","","拐","怪"],"wan":["弯","完","晚","万"],"guang":["光","","广","逛"],"kuang":["筐","狂","夼","况"],"gun":["","","滚","棍"],"hun":["婚","魂","惛","混"],"keng":["坑","","忐",""],"mao":["猫","毛","卯","冒"],"ma":["妈","麻","马","骂"],"hei":["黑","","",""],"mu":["","模","母","木"],"ken":["","","肯",""],"huang":["慌","黄","晃","晃"],"que":["缺","瘸","","却"],"huai":["","怀","","坏"],"zhou":["周","轴","肘","宙"],"kun":["昆","","捆","困"],"qia":["掐","拤","卡","恰"],"mou":["哞","谋","某",""],"zen":["撍","","怎","僭"],"nan":["囝","南","腩","难"],"lian":["","连","脸","练"],"qin":["浸","矜","寝","儭"],"qiong":["鞠","穷","",""],"ku":["哭","","苦","库"],"kei":["刻","","",""],"kuan":["宽","","棵",""],"kua":["夸","","垮","跨"],"kong":["空","","恐","控"],"la":["拉","剌","喇","辣"],"lie":["咧","咧","裂","列"],"lou":["搂","楼","篓","漏"],"lei":["勒","雷","磊","泪"],"le":["嘞","","","乐"],"lü":["","驴","吕","绿"],"leng":["棱","棱","冷","愣"],"ling":["拎","零","领","另"],"mai":["","埋","买","卖"],"shao":["烧","勺","少","绍"],"luan":["","娈","卵","乱"],"niao":["","","鸟","尿"],"len":["","","","啉"],"long":["隆","龙","拢","弄"],"man":["颟","蛮","满","慢"],"mang":["牤","忙","莽","吂"],"mie":["咩","","","灭"],"miu":["","","","谬"],"wa":["挖","娃","瓦","袜"],"m":["嘸","呣","","呣"],"nie":["捏","苶","鉨","聂"],"nu":["","奴","努","怒"],"nang":["囊","囊","曩","儾"],"nao":["孬","挠","脑","闹"],"nen":["","","","嫩"],"niang":["","娘","","酿"],"nin":["","您","拰",""],"nü":["","","女",""],"nong":["","农","繷","弄"],"nou":["","羺","啂","耨"],"nüe":["","","","虐"],"zou":["趣","","走","奏"],"rang":["嚷","瓤","壤","让"],"rao":["","饶","扰","绕"],"re":["","若","惹","热"],"ruo":["","挼","","弱"],"rou":["","柔","蹂","肉"],"ruan":["","堧","软","緛"],"run":["","撋","","润"],"sen":["森","","洒",""],"sai":["腮","","","赛"],"se":["閪","","","色"],"sang":["桑","","嗓","丧"],"sao":["骚","","扫","臊"],"shai":["筛","","色","晒"],"seng":["僧","","",""],"jiong":["扃","","窘",""],"shei":["","谁","",""],"shua":["刷","","耍","刷"],"shuai":["衰","","甩","帅"],"lüe":["","","","略"],"song":["松","鬆","耸","送"],"sou":["搜","","溲","嗽"],"xiu":["修","苬","朽","秀"],"suan":["酸","","匴","算"],"tang":["汤","糖","躺","烫"],"tei":["忒","","",""],"teng":["熥","疼","",""],"ting":["听","停","挺","梃"],"ya":["压","牙","雅","轧"],"yo":["哟","","",""],"weng":["嗡","","勜","壅"],"zan":["簪","咱","拶","赞"],"zei":["","贼","",""],"zhua":["抓","","爪",""],"zhuai":["拽","","转","拽"],"kuo":["","","","扩"],"den":["","","","扥"],"iong":["","","",""],"me":["","","",""],"dia":["","","嗲",""],"lo":["","","",""],"nun":["","黁","","媆"],"diu":["丢","","",""],"lia":["","","俩",""],"rua":["","挼","",""],"ê":["欸","欸","欸","欸"],"fiao":["","","","覅"],"sei":["","","",""],"i":["","","",""],"u":["","","",""],"ü":["","","",""],"ui":["","","",""],"iu":["","","",""],"ie":["","","",""],"üe":["","","",""],"in":["","","",""],"un":["","","",""],"ün":["","","",""],"ing":["","","",""],"ong":["","","",""],"cei":["","","",""]};
+
+    function normalizeSyl(raw) {
+      let s = String(raw || "").toLowerCase().replace(/v/g, "ü");
+      // j/q/x + u 在拼写上是 u，读音是 ü；字表用 ju/qu/xu
+      return s;
+    }
+
+    function toneHanziList(base) {
+      const key = normalizeSyl(base);
+      let arr = (TONE_CHARS[key] || ["", "", "", ""]).slice();
+      if (!arr.some(Boolean) && /[ü]/.test(key)) {
+        const alt = key.replace(/ü/g, "u");
+        if (TONE_CHARS[alt]) arr = TONE_CHARS[alt].slice();
+      }
+      if (!arr.some(Boolean) && /^[jqx]u/.test(key)) {
+        // already ju form
+      }
+      return arr;
+    }
+
+
+    function applyTone(raw, toneNum) {
+      // toneNum 1-4；先规范化 ü
+      let s = String(raw).replace(/v/g, "ü");
+      const idx = toneNum - 1;
+      const chars = [...s];
+      let markAt = -1;
+      const lower = s.toLowerCase();
+
+      if (lower.includes("a")) markAt = lower.indexOf("a");
+      else if (lower.includes("o")) markAt = lower.indexOf("o");
+      else if (lower.includes("e")) markAt = lower.indexOf("e");
+      else if (lower.includes("iu")) markAt = lower.indexOf("u"); // iu → 标在 u
+      else if (lower.includes("ui")) markAt = lower.indexOf("i"); // ui → 标在 i
+      else {
+        for (let i = chars.length - 1; i >= 0; i--) {
+          if ("aiouüv".includes(chars[i].toLowerCase()) || chars[i] === "ü") {
+            markAt = i;
+            break;
+          }
+        }
+      }
+      if (markAt < 0) return s + ["", "ˊ", "ˇ", "ˋ"][idx];
+
+      const ch = chars[markAt];
+      const key = ch === "ü" || ch === "Ü" ? "ü" : ch.toLowerCase();
+      const marks = TONE_VOWELS[key];
+      if (!marks) return s;
+      chars[markAt] = ch === ch.toUpperCase() && ch !== "ü" ? marks[idx].toUpperCase() : marks[idx];
+      return chars.join("");
+    }
+
+    function stopHornSpeak() {
+      if (window.speechSynthesis) window.speechSynthesis.cancel();
+      if (hornAudio) {
+        try {
+          hornAudio.onended = null;
+          hornAudio.onerror = null;
+          hornAudio.pause();
+          hornAudio.removeAttribute("src");
+          hornAudio.load();
+        } catch (_) {}
+        hornAudio = null;
+      }
+      if (hornTimer) {
+        clearTimeout(hornTimer);
+        hornTimer = 0;
+      }
+      hornSpeaking = false;
+      hornToneIndex = -1;
+      hornPulse = 0;
+    }
+
+    function currentPlaySyllable() {
+      if (!today || !today.quiz) return null;
+      if (playMode === "duo" || playMode === "zhengti" || playMode === "trio") return today.quiz.syllable;
+      return null;
+    }
+
+    function scheduleHornTones(delayMs) {
+      stopHornSpeak();
+      const syl = currentPlaySyllable();
+      if (!syl) return;
+      hornTonedForms = [1, 2, 3, 4].map((n) => applyTone(syl, n));
+      hornHanziForms = toneHanziList(syl);
+      hornTimer = setTimeout(() => speakFourTones(syl), delayMs == null ? 1100 : delayMs);
+    }
+
+    /** 在线中文发音（比浏览器自带 TTS 更接近标准普通话） */
+    function playOnlineZh(text) {
+      return new Promise((resolve, reject) => {
+        const urls = [
+          // 有道中文朗读
+          `https://tts.youdao.com/fanyivoice?word=${encodeURIComponent(text)}&le=zh&keyfrom=speaker-target`,
+          // 搜狗翻译语音
+          `https://fanyi.sogou.com/reventondc/synthesis?text=${encodeURIComponent(text)}&speed=1&lang=zh-CHS&from=translateweb&speaker=1`,
+          // 百度朗读
+          `https://tts.baidu.com/text2audio?lan=zh&ie=UTF-8&spd=3&text=${encodeURIComponent(text)}`,
+        ];
+        let idx = 0;
+
+        function tryNext() {
+          if (idx >= urls.length) {
+            reject(new Error("online tts failed"));
+            return;
+          }
+          const url = urls[idx++];
+          const a = new Audio();
+          hornAudio = a;
+          let settled = false;
+          const failTimer = setTimeout(() => {
+            if (settled) return;
+            settled = true;
+            tryNext();
+          }, 3500);
+
+          const done = (ok) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(failTimer);
+            if (ok) resolve();
+            else tryNext();
+          };
+
+          a.onended = () => done(true);
+          a.onerror = () => done(false);
+          a.src = url;
+          const p = a.play();
+          if (p && p.catch) p.catch(() => done(false));
+        }
+
+        tryNext();
+      });
+    }
+
+    function playSynthZh(text, opts) {
+      return new Promise((resolve) => {
+        const synth = window.speechSynthesis;
+        if (!synth) {
+          resolve(false);
+          return;
+        }
+        const u = new SpeechSynthesisUtterance(text);
+        u.lang = "zh-CN";
+        u.rate = (opts && opts.rate) || 0.85;
+        u.pitch = (opts && opts.pitch) || 1;
+        const voices = synth.getVoices();
+        const zh =
+          voices.find((v) => /zh-CN/i.test(v.lang) && /neural|online|natural|Xiaoxiao|Yunyang|Yaoyao|Huihui|晓|云|慧/i.test(v.name)) ||
+          voices.find((v) => /zh(-CN|_CN)?/i.test(v.lang)) ||
+          null;
+        if (zh) u.voice = zh;
+        u.onend = () => resolve(true);
+        u.onerror = () => resolve(false);
+        synth.cancel();
+        synth.speak(u);
+      });
+    }
+
+    function speakFourTones(base) {
+      const forms = [1, 2, 3, 4].map((n) => applyTone(base, n));
+      const hanzi = toneHanziList(base);
+      hornTonedForms = forms;
+      hornHanziForms = hanzi;
+      hornSpeaking = true;
+      hornToneIndex = 0;
+      dayPaused = true;
+      pauseAt = dayProgress;
+
+      let i = 0;
+
+      // 多音字：用词组强制正确读音（喇叭仍主要听目标音节）
+      const SPEAK_OVERRIDE = {
+        "bie|4": "别扭",
+        "chong|2": "虫子",
+        "chong|3": "宠爱",
+        "hang|2": "银行",
+        "hao|4": "号子",
+        "he|2": "和平",
+        "he|4": "祝贺",
+        "le|4": "快乐",
+        "mei|2": "没有",
+        "xing|2": "行走",
+        "xing|4": "姓氏",
+        "zhong|1": "中国",
+        "zhong|3": "种子",
+        "zhong|4": "群众",
+        "zuo|4": "做事",
+        "de|2": "得到",
+        "de|4": "目的",
+        "shui|2": "谁啊",
+        "shui|3": "水果",
+        "shui|4": "睡觉",
+        "fa|1": "发现",
+        "fa|4": "头发",
+        "chang|2": "长城",
+        "chang|3": "场地",
+        "chang|4": "唱歌",
+      };
+
+      function finish() {
+        hornSpeaking = false;
+        hornToneIndex = -1;
+        hornPulse = 0;
+        hornAudio = null;
+        if (!quizOpen) {
+          dayPaused = false;
+          dayStart = performance.now() - pauseAt * DAY_MS;
+        }
+        if (today) setStory(today, dayProgress);
+      }
+
+      async function speakNext() {
+        if (!hornSpeaking || !today) return finish();
+        if (i >= 4) return finish();
+
+        hornToneIndex = i;
+        hornPulse = 1;
+        if (today) setStory(today, dayProgress);
+
+        const hz = hanzi[i];
+        const override = SPEAK_OVERRIDE[`${normalizeSyl(base)}|${i + 1}`];
+        const spoken = override || hz;
+
+        // 画面显示「一声 mā（妈）」；声音只读汉字/词，避免系统把拼音念歪
+        if (spoken) {
+          try {
+            await playOnlineZh(spoken);
+          } catch (_) {
+            await playSynthZh(spoken, { rate: 0.82 });
+          }
+        } else {
+          // 无字可对：只报声调名（此音节普通话里常缺这个调）
+          await playSynthZh(TONE_NAMES[i], {
+            rate: [0.85, 0.95, 0.7, 1.0][i],
+            pitch: [1.3, 1.15, 0.7, 1.05][i],
+          });
+        }
+
+        i += 1;
+        // 声调之间留一点空，方便小朋友听清
+        hornTimer = setTimeout(speakNext, spoken ? 520 : 380);
+      }
+
+      // 预热语音列表
+      if (window.speechSynthesis) window.speechSynthesis.getVoices();
+      speakNext();
+    }
+
+
+    function canTwo(sm, ym) {
+      return !!(TWO[sm] && TWO[sm].includes(ym));
+    }
+
+    function findMedials(sm, ym) {
+      const map = THREE[sm];
+      if (!map) return [];
+      const list = [];
+      for (const m of ["i", "u", "ü"]) {
+        if (map[m] && map[m].includes(ym)) list.push(m);
+      }
+      return list;
+    }
+
+    /** 判题：整体认读优先，其次两拼 / 需要介母 / 不可以 */
+    function classify(sm, ym) {
+      const zt = ZHENGTI_KEY.get(`${sm}+${ym}`);
+      if (zt) return { answer: "zhengti", medial: null, medials: [], syllable: zt };
+      if (canTwo(sm, ym)) return { answer: "ok", medial: null, medials: [], syllable: writeSyllable(sm, null, ym) };
+      const medials = findMedials(sm, ym);
+      if (medials.length) {
+        // medial 先存第一个；小朋友选定后再更新为实际选择
+        const m = medials[0];
+        return {
+          answer: "medial",
+          medial: m,
+          medials,
+          syllable: writeSyllable(sm, m, ym),
+          syllables: Object.fromEntries(medials.map((x) => [x, writeSyllable(sm, x, ym)])),
+        };
+      }
+      return { answer: "no", medial: null, medials: [], syllable: null };
+    }
+
+    function writeSyllable(sm, medial, ym) {
+      let core = (medial || "") + ym;
+      if (["j", "q", "x"].includes(sm) && core.startsWith("ü")) {
+        core = core.replace(/^ü/, "u");
+      }
+      if (sm === "y" && ym === "ü") return "yu";
+      return sm + core;
+    }
+
+    function allPairsByKind() {
+      const ok = [];
+      const medial = [];
+      const no = [];
+      const zhengti = ZHENGTI_PAIRS.map(([sm, ym, syl]) => [sm, ym, { answer: "zhengti", medial: null, syllable: syl }]);
+
+      for (const sm of SHENGMU) {
+        for (const ym of YUNMU) {
+          const c = classify(sm, ym);
+          if (c.answer === "ok") ok.push([sm, ym, c]);
+          else if (c.answer === "medial") medial.push([sm, ym, c]);
+          else if (c.answer === "no") no.push([sm, ym, c]);
+          // zhengti 已由 ZHENGTI_PAIRS 收录（含 üan 等）
+        }
+      }
+      return { ok, medial, no, zhengti };
+    }
+
+    const BANK = allPairsByKind();
+
+    function pickPairForQuiz() {
+      const roll = Math.random();
+      let pool;
+      if (roll < 0.32) pool = BANK.ok;
+      else if (roll < 0.52) pool = BANK.medial;
+      else if (roll < 0.74) pool = BANK.zhengti;
+      else pool = BANK.no;
+      if (!pool.length) pool = BANK.ok;
+      const [sm, ym, c] = pick(pool);
+      return { sm, ym, ...c };
+    }
+
+    function makeDay() {
+      // 整体认读不直接从城堡出来，只通过「声母+韵母 → 整体认读」出现
+      const pair = pickPairForQuiz();
+      const starIsShengmu = Math.random() < 0.5;
+      return {
+        text: starIsShengmu ? pair.sm : pair.ym,
+        family: starIsShengmu ? "shengmu" : "yunmu",
+        alone: false,
+        sm: pair.sm,
+        ym: pair.ym,
+        quiz: pair,
+      };
+    }
+
+    function towerHome(family, L) {
+      if (family === "shengmu") return { x: L.left.cx, y: L.left.baseY - 20 };
+      if (family === "yunmu") return { x: L.right.cx, y: L.right.baseY - 20 };
+      return { x: L.mid.cx, y: L.mid.baseY - 20 };
+    }
+
+    function spawnActors(day, L) {
+      const plazaY = L.plaza.cy - 8;
+      const smHome = towerHome("shengmu", L);
+      const ymHome = towerHome("yunmu", L);
+      const smIsStar = day.family === "shengmu";
+      // 声母、韵母都会出来见面；整体认读音节不会直接出场
+      actors = [
+        {
+          kind: smIsStar ? "star" : "partner",
+          role: "sm",
+          text: day.sm,
+          family: "shengmu",
+          color: FAMILY.shengmu.color,
+          x: smHome.x,
+          y: smHome.y,
+          tx: L.plaza.cx - 52,
+          ty: plazaY,
+          visible: true,
+          phase: "exit",
+          appearAt: 0,
+          playing: false,
+        },
+        {
+          kind: smIsStar ? "partner" : "star",
+          role: "ym",
+          text: day.ym,
+          family: "yunmu",
+          color: FAMILY.yunmu.color,
+          x: ymHome.x,
+          y: ymHome.y,
+          tx: L.plaza.cx + 52,
+          ty: plazaY,
+          visible: true,
+          phase: "exit",
+          appearAt: 0.06,
+          playing: false,
+        },
+      ];
+    }
+
+    function inviteFriendsToPlaza(mode) {
+      playMode = mode;
+      const L = layout();
+      const plazaY = L.plaza.cy - 8;
+
+      actors.forEach((a) => {
+        if (a.role === "sm") {
+          a.tx = mode === "trio" ? L.plaza.cx - 70 : L.plaza.cx - 52;
+          a.ty = plazaY;
+          a.visible = true;
+          a.playing = true;
+          a.phase = "exit";
+          a.walkT = 0;
+        }
+        if (a.role === "ym") {
+          a.tx = mode === "trio" ? L.plaza.cx + 70 : L.plaza.cx + 52;
+          a.ty = plazaY;
+          a.visible = true;
+          a.playing = true;
+          a.phase = "exit";
+          a.walkT = 0;
+        }
+      });
+
+      actors = actors.filter((a) => a.role !== "jm" && a.role !== "zt");
+
+      if (mode === "trio" && today.quiz && today.quiz.medial) {
+        const m = today.quiz.medial;
+        actors.push({
+          kind: "partner",
+          role: "jm",
+          text: m,
+          family: "zhengti",
+          color: JIEMU_COLOR,
+          x: L.mid.cx,
+          y: L.mid.baseY - 30,
+          tx: L.plaza.cx,
+          ty: plazaY,
+          visible: true,
+          phase: "exit",
+          playing: true,
+          appearAt: 0,
+          walkT: 0,
+        });
+        actors.forEach((a) => {
+          if (a.role === "sm") a.tx = L.plaza.cx - 70;
+          if (a.role === "ym") a.tx = L.plaza.cx + 70;
+        });
+      }
+
+      actors.forEach((a) => { a._wasOut = true; });
+      scheduleHornTones(1200);
+    }
+
+    /** 整体认读：声母韵母回家，音节从中央城堡出来自己玩 */
+    function summonZhengtiAlone() {
+      playMode = "zhengti";
+      stopHornSpeak();
+      const L = layout();
+      const plazaY = L.plaza.cy - 8;
+      const syl = today.quiz.syllable;
+
+      actors.forEach((a) => {
+        if (a.role === "sm" || a.role === "ym") {
+          a.playing = false;
+          a.phase = "return";
+          a.goingHome = true;
+          const home = towerHome(a.family, L);
+          a.tx = home.x;
+          a.ty = home.y;
+          a.walkT = 0;
+        }
+      });
+
+      setTimeout(() => {
+        if (!today || playMode !== "zhengti") return;
+        actors = actors.filter((a) => a.role === "zt");
+        const home = towerHome("zhengti", L);
+        actors.push({
+          kind: "star",
+          role: "zt",
+          text: syl,
+          family: "zhengti",
+          color: FAMILY.zhengti.color,
+          x: home.x,
+          y: home.y,
+          tx: L.plaza.cx,
+          ty: plazaY,
+          visible: true,
+          phase: "exit",
+          playing: true,
+          walkT: 0,
+          _wasOut: true,
+        });
+        scheduleHornTones(800);
+      }, 900);
+    }
+
+    function sendHomeNoPlay() {
+      playMode = "none";
+      stopHornSpeak();
+      const L = layout();
+      actors.forEach((a) => {
+        a.playing = false;
+        a.phase = "return";
+        a.goingHome = true;
+        const home = towerHome(a.family, L);
+        a.tx = home.x;
+        a.ty = home.y;
+      });
+    }
+
+    function setStory(day, progress) {
+      const fam = FAMILY[day.family];
+      familyTagEl.hidden = false;
+      familyTagEl.className = "tag " + day.family;
+      familyTagEl.textContent = fam.name;
+      starTextEl.textContent = day.text;
+      dayNumEl.textContent = String(dayIndex);
+
+      if (quizOpen && quizStage === "can") {
+        storyTextEl.textContent = "声母在左、韵母在右——他们该怎么玩？";
+        return;
+      }
+      if (quizOpen && quizStage === "medial") {
+        const meds = (day.quiz && day.quiz.medials) || [];
+        storyTextEl.textContent = meds.length > 1
+          ? "还差介母！这里不止一个答案，选对其中一个就行。"
+          : "还差一个介母！请 i、u、ü 谁来帮忙？";
+        return;
+      }
+
+      if (progress < 0.08) {
+        storyTextEl.textContent = "太阳从左边升起——新的一天开始了！";
+      } else if (progress < 0.22) {
+        storyTextEl.textContent = `「${day.sm}」和「${day.ym}」从各自的家族里走出来了。`;
+      } else if (!quizSolved) {
+        storyTextEl.textContent = "先判断：可以拼？需要介母？整体认读？还是不可以？";
+      } else if (progress < 0.78) {
+        const q = day.quiz;
+        if (hornSpeaking && hornToneIndex >= 0) {
+          const hz = hornHanziForms[hornToneIndex] || "";
+          storyTextEl.textContent = hz
+            ? `喇叭播报：${TONE_NAMES[hornToneIndex]} ${hornTonedForms[hornToneIndex]}（${hz}）`
+            : `喇叭播报：${TONE_NAMES[hornToneIndex]} ${hornTonedForms[hornToneIndex] || ""}`;
+        } else if (playMode === "duo") {
+          storyTextEl.textContent = `可以一起玩！${day.sm} + ${day.ym} → ${q.syllable}（听喇叭读四声）`;
+        } else if (playMode === "trio") {
+          storyTextEl.textContent = `介母「${q.medial}」来牵手：${day.sm} + ${q.medial} + ${day.ym} → ${q.syllable}（听喇叭读四声）`;
+        } else if (playMode === "zhengti") {
+          storyTextEl.textContent = `整体认读「${q.syllable}」自己玩——听喇叭读四个声调！`;
+        } else {
+          storyTextEl.textContent = "他们玩不到一起，只好挥手再见啦。";
+        }
+      } else if (progress < 0.9) {
+        storyTextEl.textContent = "太阳往右边落下去了……一天快结束啦。";
+      } else {
+        storyTextEl.textContent = "夜深了，拼音们回到城堡里睡觉。";
+      }
+    }
+
+    function resumeDay() {
+      dayPaused = false;
+      dayStart = performance.now() - pauseAt * DAY_MS;
+      setStory(today, pauseAt);
+    }
+
+    function openQuiz() {
+      if (quizOpen || quizSolved || !today) return;
+      quizOpen = true;
+      quizStage = "can";
+      dayPaused = true;
+      pauseAt = dayProgress;
+      panelCan.hidden = false;
+      panelMedial.hidden = true;
+      quizSmEl.textContent = today.sm;
+      quizYmEl.textContent = today.ym;
+      quizFeedbackEl.textContent = "";
+      quizFeedbackEl.className = "feedback";
+      answerBtns.forEach((b) => {
+        b.disabled = false;
+        b.classList.remove("correct-flash", "wrong-flash");
+      });
+      quizEl.classList.add("show");
+      nextBtn.hidden = true;
+      setStory(today, dayProgress);
+    }
+
+    function openMedialQuiz() {
+      quizStage = "medial";
+      panelCan.hidden = true;
+      panelMedial.hidden = false;
+      medSmEl.textContent = today.sm;
+      medYmEl.textContent = today.ym;
+      medFeedbackEl.textContent = "";
+      medFeedbackEl.className = "feedback";
+      const meds = (today.quiz && today.quiz.medials) || [];
+      const askEl = document.getElementById("medAsk");
+      if (askEl) {
+        askEl.textContent = meds.length > 1
+          ? "这里可以有好几个介母，选对其中任意一个就行！"
+          : "请一个介母来牵手吧！选哪一个？";
+      }
+      medialBtns.forEach((b) => {
+        b.disabled = false;
+        b.classList.remove("correct-flash", "wrong-flash");
+      });
+      quizEl.classList.add("show");
+      nextBtn.hidden = true;
+      dayPaused = true;
+      setStory(today, dayProgress);
+    }
+
+    function closeQuiz() {
+      quizOpen = false;
+      quizEl.classList.remove("show");
+      nextBtn.hidden = false;
+    }
+
+    function explainAnswer(q) {
+      if (q.answer === "ok") {
+        return `答案是「可以」：${today.sm} 和 ${today.ym} 能直接拼成 ${q.syllable}。`;
+      }
+      if (q.answer === "medial") {
+        const meds = q.medials && q.medials.length ? q.medials : (q.medial ? [q.medial] : []);
+        if (meds.length > 1) {
+          return `答案是「需要介母」：可以请 ${meds.join(" 或 ")} 来帮忙。`;
+        }
+        return `答案是「需要介母」：中间要请介母「${meds[0] || q.medial}」来帮忙。`;
+      }
+      if (q.answer === "zhengti") {
+        return `答案是「整体认读」：组成「${q.syllable}」，不用拼，要整个认！`;
+      }
+      return `答案是「不可以」：这两个拼音组成不了音节。`;
+    }
+
+    function onAnswer(choice) {
+      if (!quizOpen || quizStage !== "can" || !today || !today.quiz) return;
+      const q = today.quiz;
+      const btn = answerBtns.find((b) => b.dataset.answer === choice);
+      if (!btn) return;
+
+      if (choice === q.answer) {
+        btn.classList.add("correct-flash");
+        quizFeedbackEl.className = "feedback";
+        answerBtns.forEach((b) => { b.disabled = true; });
+
+        if (choice === "ok") {
+          quizFeedbackEl.textContent = "答对啦！请他们去广场玩吧！";
+          setTimeout(() => {
+            quizSolved = true;
+            closeQuiz();
+            inviteFriendsToPlaza("duo");
+            resumeDay();
+          }, 700);
+        } else if (choice === "medial") {
+          quizFeedbackEl.textContent = "对！还需要介母帮忙～";
+          setTimeout(() => openMedialQuiz(), 700);
+        } else if (choice === "zhengti") {
+          quizFeedbackEl.textContent = `对！是整体认读「${q.syllable}」！`;
+          setTimeout(() => {
+            quizSolved = true;
+            closeQuiz();
+            summonZhengtiAlone();
+            resumeDay();
+          }, 700);
+        } else {
+          quizFeedbackEl.textContent = "答对啦！他们玩不到一起。";
+          setTimeout(() => {
+            quizSolved = true;
+            closeQuiz();
+            sendHomeNoPlay();
+            resumeDay();
+          }, 700);
+        }
+      } else {
+        btn.classList.add("wrong-flash");
+        quizFeedbackEl.className = "feedback bad";
+        quizFeedbackEl.textContent = `还不对哦，不是「${ANSWER_LABEL[choice]}」。再想想！`;
+        setTimeout(() => btn.classList.remove("wrong-flash"), 450);
+      }
+    }
+
+    function onMedialPick(choice) {
+      if (!quizOpen || quizStage !== "medial" || !today || !today.quiz) return;
+      const q = today.quiz;
+      const okList = (q.medials && q.medials.length) ? q.medials : (q.medial ? [q.medial] : []);
+      const btn = medialBtns.find((b) => b.dataset.medial === choice);
+      if (!btn) return;
+
+      if (okList.includes(choice)) {
+        // 锁定小朋友选中的介母，并更新拼出的音节
+        q.medial = choice;
+        q.syllable = (q.syllables && q.syllables[choice]) || writeSyllable(today.sm, choice, today.ym);
+        btn.classList.add("correct-flash");
+        medFeedbackEl.className = "feedback";
+        const extra = okList.length > 1
+          ? `（也可以是 ${okList.filter((m) => m !== choice).join(" / ")}）`
+          : "";
+        medFeedbackEl.textContent = `对！介母「${choice}」→ ${q.syllable}${extra}`;
+        medialBtns.forEach((b) => { b.disabled = true; });
+        setTimeout(() => {
+          quizSolved = true;
+          closeQuiz();
+          inviteFriendsToPlaza("trio");
+          resumeDay();
+        }, 900);
+      } else {
+        btn.classList.add("wrong-flash");
+        medFeedbackEl.className = "feedback bad";
+        medFeedbackEl.textContent = `「${choice}」这次不能牵手，再选！`;
+        setTimeout(() => btn.classList.remove("wrong-flash"), 450);
+      }
+    }
+
+    answerBtns.forEach((b) => {
+      b.addEventListener("click", () => onAnswer(b.dataset.answer));
+    });
+    medialBtns.forEach((b) => {
+      b.addEventListener("click", () => onMedialPick(b.dataset.medial));
+    });
+
+    function beginDay() {
+      dayIndex += 1;
+      dayStart = performance.now();
+      dayPaused = false;
+      quizSolved = false;
+      quizOpen = false;
+      quizStage = "can";
+      playMode = null;
+      stopHornSpeak();
+      closeQuiz();
+      today = makeDay();
+      playMode = null;
+      spawnActors(today, layout());
+      setStory(today, 0);
+      nextBtn.hidden = false;
+      nextBtn.textContent = "日子一天天过去 · 点这里进入下一天";
+    }
+
+    function layout() {
+      const cx = W * 0.5;
+      const ground = H * 0.78;
+      return {
+        left: { cx: W * 0.22, baseY: ground - 8, w: Math.min(120, W * 0.18), h: Math.min(180, H * 0.3) },
+        right: { cx: W * 0.78, baseY: ground - 8, w: Math.min(120, W * 0.18), h: Math.min(180, H * 0.3) },
+        mid: { cx, baseY: ground - 36, w: Math.min(140, W * 0.2), h: Math.min(220, H * 0.36) },
+        plaza: { cx, cy: ground + H * 0.045, rw: Math.min(210, W * 0.32), rh: Math.min(70, H * 0.08) },
+        horn: { cx: cx + 78, cy: ground + H * 0.01 },
+        ground,
+      };
+    }
+
+    function resize() {
+      const rect = stage.getBoundingClientRect();
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      W = rect.width;
+      H = rect.height;
+      canvas.width = Math.floor(W * dpr);
+      canvas.height = Math.floor(H * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      if (today) {
+        const L = layout();
+        actors.forEach((a) => {
+          if (a.role === "sm") a.tx = playMode === "trio" ? L.plaza.cx - 70 : L.plaza.cx - 52;
+          else if (a.role === "ym") a.tx = playMode === "trio" ? L.plaza.cx + 70 : L.plaza.cx + 52;
+          else if (a.role === "jm" || a.role === "zt") a.tx = L.plaza.cx;
+          a.ty = L.plaza.cy - 8;
+        });
+      }
+    }
+
+    function roundRect(x, y, w, h, r) {
+      const rr = Math.min(r, w / 2, h / 2);
+      ctx.beginPath();
+      ctx.moveTo(x + rr, y);
+      ctx.arcTo(x + w, y, x + w, y + h, rr);
+      ctx.arcTo(x + w, y + h, x, y + h, rr);
+      ctx.arcTo(x, y + h, x, y, rr);
+      ctx.arcTo(x, y, x + w, y, rr);
+      ctx.closePath();
+    }
+
+    function lerp(a, b, t) { return a + (b - a) * t; }
+    function easeOut(t) { return 1 - Math.pow(1 - t, 3); }
+    function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+
+    function hexToRgb(hex) {
+      const h = hex.replace("#", "");
+      return { r: parseInt(h.slice(0, 2), 16), g: parseInt(h.slice(2, 4), 16), b: parseInt(h.slice(4, 6), 16) };
+    }
+
+    function mix(a, b, t) {
+      const pa = hexToRgb(a);
+      const pb = hexToRgb(b);
+      return `rgb(${Math.round(lerp(pa.r, pb.r, t))},${Math.round(lerp(pa.g, pb.g, t))},${Math.round(lerp(pa.b, pb.b, t))})`;
+    }
+
+    function skyColors(p) {
+      if (p < 0.15) {
+        const t = p / 0.15;
+        return { top: mix("#1a2848", "#ff9a5a", t), mid: mix("#2a3a68", "#ffc98a", t), low: mix("#3a4a78", "#ffe6b0", t) };
+      }
+      if (p < 0.75) {
+        return { top: "#7ec8ff", mid: "#c8e9ff", low: "#fff3d6" };
+      }
+      if (p < 0.9) {
+        const t = (p - 0.75) / 0.15;
+        return { top: mix("#5eb0ff", "#ff7a4a", t), mid: mix("#c8e9ff", "#ffb070", t), low: mix("#fff3d6", "#ffd0a0", t) };
+      }
+      const t = (p - 0.9) / 0.1;
+      return { top: mix("#ff7a4a", "#0e1a30", t), mid: mix("#ffb070", "#1a2a48", t), low: mix("#ffd0a0", "#243858", t) };
+    }
+
+    function sunPos(p) {
+      const x = lerp(-40, W + 40, p);
+      const arc = Math.sin(Math.PI * clamp(p, 0, 1));
+      const y = H * 0.55 - arc * H * 0.38;
+      return { x, y, visible: p > 0.02 && p < 0.95 };
+    }
+
+    function drawCloud(x, y, s, a) {
+      ctx.save();
+      ctx.globalAlpha = a;
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath();
+      ctx.ellipse(x, y, 38 * s, 18 * s, 0, 0, Math.PI * 2);
+      ctx.ellipse(x - 28 * s, y + 4 * s, 24 * s, 14 * s, 0, 0, Math.PI * 2);
+      ctx.ellipse(x + 30 * s, y + 2 * s, 26 * s, 15 * s, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function drawSun(x, y) {
+      ctx.fillStyle = "rgba(255,210,80,0.28)";
+      ctx.beginPath();
+      ctx.arc(x, y, 48, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#ffd45a";
+      ctx.beginPath();
+      ctx.arc(x, y, 26, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function drawMoon(x, y, a) {
+      ctx.save();
+      ctx.globalAlpha = a;
+      ctx.fillStyle = "#e8f0ff";
+      ctx.beginPath();
+      ctx.arc(x, y, 18, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalCompositeOperation = "destination-out";
+      ctx.beginPath();
+      ctx.arc(x + 8, y - 4, 14, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function drawBanner(x, y, text, color, sway) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(sway);
+      ctx.strokeStyle = "#8b6a3f";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(0, -8);
+      ctx.lineTo(0, 52);
+      ctx.stroke();
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.moveTo(2, 0);
+      ctx.lineTo(56, 10);
+      ctx.lineTo(56, 34);
+      ctx.lineTo(2, 44);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = "#fff";
+      ctx.font = `700 ${Math.max(11, W * 0.018)}px "Noto Sans SC", sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(text, 30, 22);
+      ctx.restore();
+    }
+
+    function drawTower(cx, baseY, w, h, color, soft, label, sway, roofH, lit) {
+      const x = cx - w / 2;
+      const y = baseY - h;
+      const g = ctx.createLinearGradient(x, y, x + w, y);
+      g.addColorStop(0, soft);
+      g.addColorStop(0.45, color);
+      g.addColorStop(1, soft);
+      ctx.fillStyle = g;
+      roundRect(x, y, w, h, 10);
+      ctx.fill();
+
+      ctx.fillStyle = lit ? "#ffe9a0" : "#fff6d8";
+      const winW = Math.max(10, w * 0.16);
+      const winH = Math.max(14, h * 0.12);
+      for (let row = 0; row < 2; row++) {
+        for (let col = 0; col < 2; col++) {
+          roundRect(x + w * 0.22 + col * w * 0.38, y + h * 0.22 + row * h * 0.28, winW, winH, 4);
+          ctx.fill();
+        }
+      }
+
+      ctx.fillStyle = color;
+      const merlon = Math.max(10, w / 6);
+      for (let i = 0; i < 5; i++) {
+        roundRect(x + i * merlon * 1.15, y - 14, merlon * 0.75, 18, 3);
+        ctx.fill();
+      }
+
+      ctx.fillStyle = "#c45a2a";
+      ctx.beginPath();
+      ctx.moveTo(cx - w * 0.42, y - 8);
+      ctx.lineTo(cx, y - roofH);
+      ctx.lineTo(cx + w * 0.42, y - 8);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.fillStyle = "#6b4a2e";
+      roundRect(cx - w * 0.16, baseY - h * 0.28, w * 0.32, h * 0.28, 8);
+      ctx.fill();
+
+      ctx.fillStyle = "rgba(255,255,255,0.92)";
+      roundRect(cx - w * 0.38, y + h * 0.58, w * 0.76, 28, 10);
+      ctx.fill();
+      ctx.fillStyle = color;
+      ctx.font = `700 ${Math.max(12, w * 0.14)}px "ZCOOL KuaiLe", sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(label, cx, y + h * 0.58 + 15);
+      drawBanner(cx + w * 0.42, y - 20, label.slice(0, 2), color, sway);
+    }
+
+    function drawHorn(cx, cy) {
+      const pulse = hornSpeaking ? 0.55 + 0.45 * Math.abs(Math.sin(performance.now() / 140)) : hornPulse;
+      const scale = 1 + pulse * 0.1;
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.scale(scale, scale);
+      ctx.fillStyle = "#8b5a2b";
+      roundRect(-6, -10, 12, 78, 4);
+      ctx.fill();
+      ctx.fillStyle = "#f0a01a";
+      ctx.beginPath();
+      ctx.moveTo(-8, -8);
+      ctx.lineTo(48, -36);
+      ctx.lineTo(48, 28);
+      ctx.lineTo(-8, 10);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = "#ffe6a8";
+      ctx.beginPath();
+      ctx.ellipse(48, -4, 6, 26, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (pulse > 0.05) {
+        ctx.strokeStyle = `rgba(240,160,26,${0.5 * pulse})`;
+        ctx.lineWidth = 3;
+        for (let i = 1; i <= 3; i++) {
+          ctx.beginPath();
+          ctx.arc(58, -4, 12 + i * 12 * pulse, -0.75, 0.75);
+          ctx.stroke();
+        }
+      }
+
+      // 四声展示条
+      if ((hornSpeaking || hornTonedForms.length) && (playMode === "duo" || playMode === "trio" || playMode === "zhengti")) {
+        const forms = hornTonedForms.length ? hornTonedForms : [1, 2, 3, 4].map((n) => applyTone(currentPlaySyllable() || "", n));
+        const boxW = Math.min(200, W * 0.42);
+        ctx.restore();
+        ctx.save();
+        ctx.fillStyle = "rgba(255,255,255,0.94)";
+        roundRect(cx - boxW / 2, cy - 88, boxW, 62, 14);
+        ctx.fill();
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        forms.forEach((f, i) => {
+          const x = cx - boxW / 2 + (boxW * (i + 0.5)) / 4;
+          const hz = (hornHanziForms[i] || "");
+          ctx.fillStyle = i === hornToneIndex ? "#c47a12" : "rgba(42,58,74,0.45)";
+          ctx.font = `700 ${Math.max(10, W * 0.014)}px "Noto Sans SC", sans-serif`;
+          ctx.fillText(TONE_NAMES[i], x, cy - 66);
+          ctx.font = `700 ${Math.max(12, W * 0.018)}px "ZCOOL KuaiLe", sans-serif`;
+          ctx.fillStyle = i === hornToneIndex ? "#e86a3c" : "#2a3a4a";
+          ctx.fillText(hz ? `${f}` : f, x, cy - 48);
+          if (hz) {
+            ctx.font = `700 ${Math.max(11, W * 0.016)}px "Noto Sans SC", sans-serif`;
+            ctx.fillStyle = i === hornToneIndex ? "#2a9d8f" : "rgba(42,58,74,0.55)";
+            ctx.fillText(hz, x, cy - 32);
+          }
+        });
+        ctx.restore();
+        hornPulse = Math.max(0, hornPulse - 0.02);
+        return;
+      }
+
+      ctx.restore();
+      hornPulse = Math.max(0, hornPulse - 0.02);
+    }
+
+    function drawPlaza(cx, cy, rw, rh) {
+      ctx.fillStyle = "#c9b89a";
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, rw, rh, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function drawActor(a, t) {
+      if (!a.visible) return;
+      const bob = Math.sin(t * 6 + a.x * 0.01) * (a.phase === "play" ? 5 : 2);
+      const x = a.x;
+      const y = a.y + bob;
+
+      ctx.fillStyle = "rgba(42,58,74,0.15)";
+      ctx.beginPath();
+      ctx.ellipse(x, a.ty + 28, 22, 7, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = a.color;
+      ctx.beginPath();
+      ctx.ellipse(x, y, 28, 24, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,0.92)";
+      roundRect(x - 22, y - 14, 44, 28, 12);
+      ctx.fill();
+      ctx.fillStyle = a.color;
+      ctx.font = `700 ${Math.max(15, 40 / Math.max(1, a.text.length * 0.55))}px "ZCOOL KuaiLe", sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(a.text, x, y + 1);
+
+      ctx.fillStyle = "#2a3a4a";
+      ctx.beginPath();
+      ctx.arc(x - 10, y - 22, 2.2, 0, Math.PI * 2);
+      ctx.arc(x + 10, y - 22, 2.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function drawResultBubble(L, t) {
+      if (!today || !quizSolved || dayProgress < 0.4 || dayProgress > 0.82) return;
+      if (playMode !== "duo" && playMode !== "trio" && playMode !== "zhengti") return;
+      const q = today.quiz;
+      const cx = L.plaza.cx;
+      const cy = L.plaza.cy - 78;
+      ctx.fillStyle = "rgba(255,255,255,0.95)";
+      roundRect(cx - 90, cy - 22, 180, 44, 16);
+      ctx.fill();
+      ctx.fillStyle = "#2a3a4a";
+      ctx.font = `700 ${Math.max(16, W * 0.026)}px "ZCOOL KuaiLe", sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      if (playMode === "duo" || playMode === "zhengti") ctx.fillText(q.syllable, cx, cy);
+      else ctx.fillText(`${today.sm}-${q.medial}-${today.ym}`, cx, cy);
+    }
+
+    function updateActors(progress, t) {
+      const L = layout();
+      actors.forEach((a) => {
+        // 答题前：声母韵母都走到广场两侧等待
+        if (playMode === null) {
+          const delay = a.appearAt || 0;
+          const home = towerHome(a.family, L);
+          const waitX = a.role === "sm" ? L.plaza.cx - 52 : L.plaza.cx + 52;
+          const waitY = L.plaza.cy - 8;
+          a.visible = true;
+          if (progress < 0.08 + delay) {
+            a.x = home.x;
+            a.y = home.y;
+          } else {
+            const u = easeOut(clamp((progress - 0.08 - delay) / 0.18, 0, 1));
+            a.x = lerp(home.x, waitX, u);
+            a.y = lerp(home.y, waitY, u);
+            a._wasOut = true;
+          }
+          return;
+        }
+
+        // 不能玩 / 整体认读换人：先回家
+        if (playMode === "none" || (playMode === "zhengti" && (a.role === "sm" || a.role === "ym"))) {
+          const home = towerHome(a.family, L);
+          a.x = lerp(a.x, home.x, 0.1);
+          a.y = lerp(a.y, home.y, 0.1);
+          if (Math.hypot(a.x - home.x, a.y - home.y) < 14) a.visible = false;
+          return;
+        }
+
+        // 玩耍中（两拼 / 三拼 / 整体认读自己玩）
+        if (a.playing) {
+          a.visible = true;
+          a.walkT = (a.walkT || 0) + 0.04;
+          a.x = lerp(a.x, a.tx, 0.1);
+          a.y = lerp(a.y, a.ty, 0.1);
+
+          const arrived = Math.hypot(a.x - a.tx, a.y - a.ty) < 8;
+          if (arrived && progress < 0.8) {
+            a.phase = "play";
+            if (a.role === "zt") {
+              a.x = a.tx + Math.sin(t * 2.2) * 28;
+            } else if (playMode === "duo" || playMode === "trio") {
+              a.y = a.ty + Math.sin(t * 5 + (a.role === "sm" ? 0 : a.role === "ym" ? 1 : 2)) * 4;
+            }
+          }
+        }
+
+        if (progress >= 0.8) {
+          a.phase = "return";
+          const home = towerHome(a.role === "jm" || a.role === "zt" ? "zhengti" : a.family, L);
+          a.x = lerp(a.x, home.x, 0.08);
+          a.y = lerp(a.y, home.y, 0.08);
+          if (Math.hypot(a.x - home.x, a.y - home.y) < 12) a.visible = false;
+        }
+      });
+    }
+
+    function draw(now) {
+      const t = (now - t0) / 1000;
+      if (!dayPaused) {
+        dayProgress = clamp((now - dayStart) / DAY_MS, 0, 1);
+      } else {
+        dayProgress = pauseAt;
+      }
+
+      if (today) setStory(today, dayProgress);
+
+      // 声母韵母出门后弹出题目
+      if (today && !quizSolved && !quizOpen && dayProgress >= 0.28 && dayProgress < 0.8) {
+        openQuiz();
+      }
+
+      updateActors(dayProgress, t);
+
+      const sky = skyColors(dayProgress);
+      const g = ctx.createLinearGradient(0, 0, 0, H);
+      g.addColorStop(0, sky.top);
+      g.addColorStop(0.45, sky.mid);
+      g.addColorStop(0.62, sky.low);
+      g.addColorStop(0.63, "#9fd46a");
+      g.addColorStop(0.82, "#5dbb4a");
+      g.addColorStop(1, "#3f9a38");
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, H);
+
+      const night = clamp((dayProgress - 0.88) / 0.12, 0, 1);
+      const sun = sunPos(dayProgress);
+      if (sun.visible) drawSun(sun.x, sun.y);
+      if (night > 0.2) drawMoon(W * 0.78, H * 0.16, night);
+
+      drawCloud((t * 12 + dayIndex * 40) % (W + 120) - 60, H * 0.14, 1.05, 0.7 * (1 - night * 0.5));
+      drawCloud((t * 7 + 260) % (W + 160) - 80, H * 0.22, 0.8, 0.5 * (1 - night * 0.5));
+
+      ctx.fillStyle = "#6fbf55";
+      ctx.beginPath();
+      ctx.moveTo(0, H * 0.62);
+      ctx.quadraticCurveTo(W * 0.25, H * 0.52, W * 0.5, H * 0.6);
+      ctx.quadraticCurveTo(W * 0.75, H * 0.68, W, H * 0.55);
+      ctx.lineTo(W, H);
+      ctx.lineTo(0, H);
+      ctx.fill();
+
+      const L = layout();
+      const swayL = Math.sin(t * 1.6) * 0.08;
+      const swayR = Math.sin(t * 1.6 + 1.2) * 0.08;
+      const swayM = Math.sin(t * 1.6 + 2.1) * 0.08;
+      const lit = night > 0.35;
+
+      ctx.strokeStyle = "#b89a78";
+      ctx.lineWidth = 22;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(L.left.cx + L.left.w * 0.35, L.left.baseY - L.left.h * 0.55);
+      ctx.lineTo(L.mid.cx - L.mid.w * 0.4, L.mid.baseY - L.mid.h * 0.45);
+      ctx.moveTo(L.mid.cx + L.mid.w * 0.4, L.mid.baseY - L.mid.h * 0.45);
+      ctx.lineTo(L.right.cx - L.right.w * 0.35, L.right.baseY - L.right.h * 0.55);
+      ctx.stroke();
+
+      ctx.fillStyle = "#b89a78";
+      roundRect(L.mid.cx - 40, L.ground - 70, 80, 70, 8);
+      ctx.fill();
+      ctx.fillStyle = "#5a4030";
+      ctx.beginPath();
+      ctx.moveTo(L.mid.cx - 26, L.ground);
+      ctx.lineTo(L.mid.cx - 26, L.ground - 42);
+      ctx.arc(L.mid.cx, L.ground - 42, 26, Math.PI, 0);
+      ctx.lineTo(L.mid.cx + 26, L.ground);
+      ctx.fill();
+
+      drawTower(L.left.cx, L.left.baseY, L.left.w, L.left.h, FAMILY.shengmu.color, FAMILY.shengmu.soft, "声母", swayL, 48, lit);
+      drawTower(L.right.cx, L.right.baseY, L.right.w, L.right.h, FAMILY.yunmu.color, FAMILY.yunmu.soft, "韵母", swayR, 48, lit);
+      drawTower(L.mid.cx, L.mid.baseY, L.mid.w, L.mid.h, FAMILY.zhengti.color, FAMILY.zhengti.soft, "整体认读", swayM, 64, lit);
+
+      drawPlaza(L.plaza.cx, L.plaza.cy, L.plaza.rw, L.plaza.rh);
+      drawHorn(L.horn.cx, L.horn.cy);
+      drawResultBubble(L, t);
+      actors.forEach((a) => drawActor(a, t));
+
+      if (night > 0) {
+        ctx.fillStyle = `rgba(10,18,36,${0.45 * night})`;
+        ctx.fillRect(0, 0, W, H);
+      }
+
+      if (dayProgress >= 1 && !advancing && !dayPaused) {
+        advancing = true;
+        setTimeout(() => {
+          beginDay();
+          advancing = false;
+        }, 500);
+      }
+
+      requestAnimationFrame(draw);
+    }
+
+    nextBtn.addEventListener("click", () => {
+      if (advancing || quizOpen || hornSpeaking) return;
+      beginDay();
+    });
+
+    canvas.addEventListener("pointerdown", (e) => {
+      if (quizOpen) return;
+      const rect = canvas.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+      const L = layout();
+      const dx = mx - L.horn.cx;
+      const dy = my - (L.horn.cy + 20);
+      if (dx * dx + dy * dy < 70 * 70) {
+        if (playMode === "duo" || playMode === "trio" || playMode === "zhengti") {
+          scheduleHornTones(0);
+        } else {
+          hornPulse = 1;
+        }
+      }
+    });
+
+    // 预热中文语音列表
+    if (window.speechSynthesis) {
+      window.speechSynthesis.getVoices();
+      window.speechSynthesis.addEventListener("voiceschanged", () => {
+        window.speechSynthesis.getVoices();
+      });
+    }
+
+    window.addEventListener("resize", resize);
+    resize();
+    dayIndex = 0;
+    beginDay();
+    requestAnimationFrame(draw);
+  </script>
+</body>
+</html>
