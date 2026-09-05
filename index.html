@@ -11,6 +11,7 @@
     :root {
       --ink: #2a3a4a;
       --shengmu: #e86a3c;
+      --jiemu: #3b82f6;
       --yunmu: #2a9d8f;
       --zhengti: #e9a825;
       font-family: "Noto Sans SC", "Microsoft YaHei", sans-serif;
@@ -116,6 +117,7 @@
     }
 
     .story .tag.shengmu { background: var(--shengmu); }
+    .story .tag.jiemu { background: var(--jiemu); }
     .story .tag.yunmu { background: var(--yunmu); }
     .story .tag.zhengti { background: var(--zhengti); }
 
@@ -280,7 +282,7 @@
     }
 
     .chip.jm {
-      background: #5b7cfa;
+      background: var(--jiemu);
     }
 
     .quiz-panel[hidden] {
@@ -429,12 +431,12 @@
 
     const FAMILY = {
       shengmu: { id: "shengmu", name: "声母家族", color: "#e86a3c", soft: "#ffb089", label: "声母" },
+      jiemu: { id: "jiemu", name: "介母家族", color: "#3b82f6", soft: "#93c5fd", label: "介母" },
       yunmu: { id: "yunmu", name: "韵母家族", color: "#2a9d8f", soft: "#7ed6cb", label: "韵母" },
       zhengti: { id: "zhengti", name: "整体认读家族", color: "#e9a825", soft: "#ffe08a", label: "整体认读" },
     };
 
     const ANSWER_LABEL = { ok: "可以", medial: "需要介母", no: "不可以", zhengti: "整体认读" };
-    const JIEMU_COLOR = "#5b7cfa";
 
     const canvas = document.getElementById("scene");
     const ctx = canvas.getContext("2d");
@@ -840,9 +842,8 @@
     }
 
     function towerHome(family, L) {
-      if (family === "shengmu") return { x: L.left.cx, y: L.left.baseY - 20 };
-      if (family === "yunmu") return { x: L.right.cx, y: L.right.baseY - 20 };
-      return { x: L.mid.cx, y: L.mid.baseY - 20 };
+      const t = L.towers[family] || L.towers.zhengti;
+      return { x: t.cx, y: t.baseY - 20 };
     }
 
     function spawnActors(day, L) {
@@ -913,14 +914,15 @@
 
       if (mode === "trio" && today.quiz && today.quiz.medial) {
         const m = today.quiz.medial;
+        const jmHome = towerHome("jiemu", L);
         actors.push({
           kind: "partner",
           role: "jm",
           text: m,
-          family: "zhengti",
-          color: JIEMU_COLOR,
-          x: L.mid.cx,
-          y: L.mid.baseY - 30,
+          family: "jiemu",
+          color: FAMILY.jiemu.color,
+          x: jmHome.x,
+          y: jmHome.y - 10,
           tx: L.plaza.cx,
           ty: plazaY,
           visible: true,
@@ -1020,7 +1022,7 @@
       if (progress < 0.08) {
         storyTextEl.textContent = "太阳从左边升起——新的一天开始了！";
       } else if (progress < 0.22) {
-        storyTextEl.textContent = `「${day.sm}」和「${day.ym}」从各自的家族里走出来了。`;
+        storyTextEl.textContent = `「${day.sm}」和「${day.ym}」从声母塔、韵母塔里走出来了。`;
       } else if (!quizSolved) {
         storyTextEl.textContent = "先判断：可以拼？需要介母？整体认读？还是不可以？";
       } else if (progress < 0.78) {
@@ -1033,7 +1035,7 @@
         } else if (playMode === "duo") {
           storyTextEl.textContent = `可以一起玩！${day.sm} + ${day.ym} → ${q.syllable}（听喇叭读四声）`;
         } else if (playMode === "trio") {
-          storyTextEl.textContent = `介母「${q.medial}」来牵手：${day.sm} + ${q.medial} + ${day.ym} → ${q.syllable}（听喇叭读四声）`;
+          storyTextEl.textContent = `介母「${q.medial}」从蓝色城堡出来牵手：${day.sm} + ${q.medial} + ${day.ym} → ${q.syllable}（听喇叭读四声）`;
         } else if (playMode === "zhengti") {
           storyTextEl.textContent = `整体认读「${q.syllable}」自己玩——听喇叭读四个声调！`;
         } else {
@@ -1228,12 +1230,21 @@
     function layout() {
       const cx = W * 0.5;
       const ground = H * 0.78;
+      const tw = Math.min(96, W * 0.13);
+      const th = Math.min(150, H * 0.26);
+      const baseY = ground - 8;
+      // 左→右：声母、介母、韵母、整体认读
+      const towers = {
+        shengmu: { cx: W * 0.12, baseY, w: tw, h: th },
+        jiemu: { cx: W * 0.34, baseY, w: tw, h: th },
+        yunmu: { cx: W * 0.66, baseY, w: tw, h: th },
+        zhengti: { cx: W * 0.88, baseY: ground - 28, w: Math.min(110, W * 0.15), h: Math.min(188, H * 0.32) },
+      };
       return {
-        left: { cx: W * 0.22, baseY: ground - 8, w: Math.min(120, W * 0.18), h: Math.min(180, H * 0.3) },
-        right: { cx: W * 0.78, baseY: ground - 8, w: Math.min(120, W * 0.18), h: Math.min(180, H * 0.3) },
-        mid: { cx, baseY: ground - 36, w: Math.min(140, W * 0.2), h: Math.min(220, H * 0.36) },
+        towers,
         plaza: { cx, cy: ground + H * 0.045, rw: Math.min(210, W * 0.32), rh: Math.min(70, H * 0.08) },
         horn: { cx: cx + 78, cy: ground + H * 0.01 },
+        gate: { cx },
         ground,
       };
     }
@@ -1413,7 +1424,7 @@
       roundRect(cx - w * 0.38, y + h * 0.58, w * 0.76, 28, 10);
       ctx.fill();
       ctx.fillStyle = color;
-      ctx.font = `700 ${Math.max(12, w * 0.14)}px "ZCOOL KuaiLe", sans-serif`;
+      ctx.font = `700 ${Math.max(11, w * (label.length > 2 ? 0.11 : 0.14))}px "ZCOOL KuaiLe", sans-serif`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(label, cx, y + h * 0.58 + 15);
@@ -1593,7 +1604,7 @@
 
         if (progress >= 0.8) {
           a.phase = "return";
-          const home = towerHome(a.role === "jm" || a.role === "zt" ? "zhengti" : a.family, L);
+          const home = towerHome(a.family, L);
           a.x = lerp(a.x, home.x, 0.08);
           a.y = lerp(a.y, home.y, 0.08);
           if (Math.hypot(a.x - home.x, a.y - home.y) < 12) a.visible = false;
@@ -1647,35 +1658,43 @@
       ctx.fill();
 
       const L = layout();
-      const swayL = Math.sin(t * 1.6) * 0.08;
-      const swayR = Math.sin(t * 1.6 + 1.2) * 0.08;
-      const swayM = Math.sin(t * 1.6 + 2.1) * 0.08;
+      const T = L.towers;
+      const swaySm = Math.sin(t * 1.6) * 0.08;
+      const swayJm = Math.sin(t * 1.6 + 0.7) * 0.08;
+      const swayYm = Math.sin(t * 1.6 + 1.4) * 0.08;
+      const swayZt = Math.sin(t * 1.6 + 2.1) * 0.08;
       const lit = night > 0.35;
 
+      // 城墙：声母—介母—大门—韵母—整体认读
       ctx.strokeStyle = "#b89a78";
-      ctx.lineWidth = 22;
+      ctx.lineWidth = 18;
       ctx.lineCap = "round";
       ctx.beginPath();
-      ctx.moveTo(L.left.cx + L.left.w * 0.35, L.left.baseY - L.left.h * 0.55);
-      ctx.lineTo(L.mid.cx - L.mid.w * 0.4, L.mid.baseY - L.mid.h * 0.45);
-      ctx.moveTo(L.mid.cx + L.mid.w * 0.4, L.mid.baseY - L.mid.h * 0.45);
-      ctx.lineTo(L.right.cx - L.right.w * 0.35, L.right.baseY - L.right.h * 0.55);
+      ctx.moveTo(T.shengmu.cx + T.shengmu.w * 0.35, T.shengmu.baseY - T.shengmu.h * 0.55);
+      ctx.lineTo(T.jiemu.cx - T.jiemu.w * 0.35, T.jiemu.baseY - T.jiemu.h * 0.55);
+      ctx.moveTo(T.jiemu.cx + T.jiemu.w * 0.35, T.jiemu.baseY - T.jiemu.h * 0.5);
+      ctx.lineTo(L.gate.cx - 36, L.ground - 55);
+      ctx.moveTo(L.gate.cx + 36, L.ground - 55);
+      ctx.lineTo(T.yunmu.cx - T.yunmu.w * 0.35, T.yunmu.baseY - T.yunmu.h * 0.5);
+      ctx.moveTo(T.yunmu.cx + T.yunmu.w * 0.35, T.yunmu.baseY - T.yunmu.h * 0.55);
+      ctx.lineTo(T.zhengti.cx - T.zhengti.w * 0.35, T.zhengti.baseY - T.zhengti.h * 0.45);
       ctx.stroke();
 
       ctx.fillStyle = "#b89a78";
-      roundRect(L.mid.cx - 40, L.ground - 70, 80, 70, 8);
+      roundRect(L.gate.cx - 40, L.ground - 70, 80, 70, 8);
       ctx.fill();
       ctx.fillStyle = "#5a4030";
       ctx.beginPath();
-      ctx.moveTo(L.mid.cx - 26, L.ground);
-      ctx.lineTo(L.mid.cx - 26, L.ground - 42);
-      ctx.arc(L.mid.cx, L.ground - 42, 26, Math.PI, 0);
-      ctx.lineTo(L.mid.cx + 26, L.ground);
+      ctx.moveTo(L.gate.cx - 26, L.ground);
+      ctx.lineTo(L.gate.cx - 26, L.ground - 42);
+      ctx.arc(L.gate.cx, L.ground - 42, 26, Math.PI, 0);
+      ctx.lineTo(L.gate.cx + 26, L.ground);
       ctx.fill();
 
-      drawTower(L.left.cx, L.left.baseY, L.left.w, L.left.h, FAMILY.shengmu.color, FAMILY.shengmu.soft, "声母", swayL, 48, lit);
-      drawTower(L.right.cx, L.right.baseY, L.right.w, L.right.h, FAMILY.yunmu.color, FAMILY.yunmu.soft, "韵母", swayR, 48, lit);
-      drawTower(L.mid.cx, L.mid.baseY, L.mid.w, L.mid.h, FAMILY.zhengti.color, FAMILY.zhengti.soft, "整体认读", swayM, 64, lit);
+      drawTower(T.shengmu.cx, T.shengmu.baseY, T.shengmu.w, T.shengmu.h, FAMILY.shengmu.color, FAMILY.shengmu.soft, "声母", swaySm, 42, lit);
+      drawTower(T.jiemu.cx, T.jiemu.baseY, T.jiemu.w, T.jiemu.h, FAMILY.jiemu.color, FAMILY.jiemu.soft, "介母", swayJm, 42, lit);
+      drawTower(T.yunmu.cx, T.yunmu.baseY, T.yunmu.w, T.yunmu.h, FAMILY.yunmu.color, FAMILY.yunmu.soft, "韵母", swayYm, 42, lit);
+      drawTower(T.zhengti.cx, T.zhengti.baseY, T.zhengti.w, T.zhengti.h, FAMILY.zhengti.color, FAMILY.zhengti.soft, "整体认读", swayZt, 56, lit);
 
       drawPlaza(L.plaza.cx, L.plaza.cy, L.plaza.rw, L.plaza.rh);
       drawHorn(L.horn.cx, L.horn.cy);
