@@ -554,8 +554,48 @@
       return chars.join("");
     }
 
+    let audioUnlocked = false;
+    let audioBlocked = false; // 手机拦截自动播放后，本轮只做画面播报，不卡流程
+
+    function unlockAudio() {
+      if (audioUnlocked) return;
+      audioUnlocked = true;
+      try {
+        // 静音短音：在用户点击手势里解锁 Audio / iOS 策略
+        const a = new Audio(
+          "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQAAAAA="
+        );
+        a.volume = 0.01;
+        const p = a.play();
+        if (p && p.then) p.then(() => a.pause()).catch(() => {});
+      } catch (_) {}
+      try {
+        const synth = window.speechSynthesis;
+        if (synth) {
+          synth.getVoices();
+          const u = new SpeechSynthesisUtterance("。");
+          u.volume = 0;
+          u.rate = 2;
+          u.lang = "zh-CN";
+          synth.speak(u);
+          synth.cancel();
+        }
+      } catch (_) {}
+    }
+
+    function releaseHornPause() {
+      if (!quizOpen && dayPaused) {
+        dayPaused = false;
+        dayStart = performance.now() - pauseAt * DAY_MS;
+      }
+    }
+
     function stopHornSpeak() {
-      if (window.speechSynthesis) window.speechSynthesis.cancel();
+      // 作废正在进行的四声播报（含异步 await）
+      speakFourTones._gen = (speakFourTones._gen || 0) + 1;
+      if (window.speechSynthesis) {
+        try { window.speechSynthesis.cancel(); } catch (_) {}
+      }
       if (hornAudio) {
         try {
           hornAudio.onended = null;
@@ -570,9 +610,11 @@
         clearTimeout(hornTimer);
         hornTimer = 0;
       }
+      const was = hornSpeaking;
       hornSpeaking = false;
       hornToneIndex = -1;
       hornPulse = 0;
+      if (was) releaseHornPause();
     }
 
     function currentPlaySyllable() {
@@ -587,18 +629,25 @@
       if (!syl) return;
       hornTonedForms = [1, 2, 3, 4].map((n) => applyTone(syl, n));
       hornHanziForms = toneHanziList(syl);
-      hornTimer = setTimeout(() => speakFourTones(syl), delayMs == null ? 1100 : delayMs);
+      // 答题点击后手势已过期，手机上尽快播；失败也不阻塞
+      const delay = delayMs == null ? 400 : delayMs;
+      hornTimer = setTimeout(() => speakFourTones(syl), delay);
     }
 
-    /** 在线中文发音（比浏览器自带 TTS 更接近标准普通话） */
+    function waitMs(ms) {
+      return new Promise((resolve) => setTimeout(resolve, ms));
+    }
+
+    /** 在线中文发音；被拦截或失败时快速放弃，绝不挂死 */
     function playOnlineZh(text) {
       return new Promise((resolve, reject) => {
+        if (audioBlocked) {
+          reject(new Error("audio blocked"));
+          return;
+        }
         const urls = [
-          // 有道中文朗读
           `https://tts.youdao.com/fanyivoice?word=${encodeURIComponent(text)}&le=zh&keyfrom=speaker-target`,
-          // 搜狗翻译语音
           `https://fanyi.sogou.com/reventondc/synthesis?text=${encodeURIComponent(text)}&speed=1&lang=zh-CHS&from=translateweb&speaker=1`,
-          // 百度朗读
           `https://tts.baidu.com/text2audio?lan=zh&ie=UTF-8&spd=3&text=${encodeURIComponent(text)}`,
         ];
         let idx = 0;
@@ -610,19 +659,21 @@
           }
           const url = urls[idx++];
           const a = new Audio();
+          a.preload = "auto";
           hornAudio = a;
           let settled = false;
           const failTimer = setTimeout(() => {
             if (settled) return;
             settled = true;
+            try { a.pause(); } catch (_) {}
             tryNext();
-          }, 3500);
+          }, 2200);
 
           const done = (ok) => {
             if (settled) return;
             settled = true;
             clearTimeout(failTimer);
-            if (ok) resolve();
+            if (ok) resolve(true);
             else tryNext();
           };
 
@@ -630,7 +681,19 @@
           a.onerror = () => done(false);
           a.src = url;
           const p = a.play();
-          if (p && p.catch) p.catch(() => done(false));
+          if (p && p.catch) {
+            p.catch((err) => {
+              const msg = String((err && (err.name || err.message)) || err || "");
+              if (/NotAllowed|not allowed|NotSupported/i.test(msg)) {
+                audioBlocked = true;
+                settled = true;
+                clearTimeout(failTimer);
+                reject(err || new Error("not allowed"));
+                return;
+              }
+              done(false);
+            });
+          }
         }
 
         tryNext();
@@ -640,25 +703,54 @@
     function playSynthZh(text, opts) {
       return new Promise((resolve) => {
         const synth = window.speechSynthesis;
-        if (!synth) {
+        if (!synth || audioBlocked) {
           resolve(false);
           return;
         }
-        const u = new SpeechSynthesisUtterance(text);
-        u.lang = "zh-CN";
-        u.rate = (opts && opts.rate) || 0.85;
-        u.pitch = (opts && opts.pitch) || 1;
-        const voices = synth.getVoices();
-        const zh =
-          voices.find((v) => /zh-CN/i.test(v.lang) && /neural|online|natural|Xiaoxiao|Yunyang|Yaoyao|Huihui|晓|云|慧/i.test(v.name)) ||
-          voices.find((v) => /zh(-CN|_CN)?/i.test(v.lang)) ||
-          null;
-        if (zh) u.voice = zh;
-        u.onend = () => resolve(true);
-        u.onerror = () => resolve(false);
-        synth.cancel();
-        synth.speak(u);
+        let settled = false;
+        const finish = (ok) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          resolve(ok);
+        };
+        // 手机上 speechSynthesis 常不触发 onend，必须超时兜底
+        const timer = setTimeout(() => {
+          try { synth.cancel(); } catch (_) {}
+          finish(false);
+        }, 2200);
+
+        try {
+          const u = new SpeechSynthesisUtterance(text);
+          u.lang = "zh-CN";
+          u.rate = (opts && opts.rate) || 0.85;
+          u.pitch = (opts && opts.pitch) || 1;
+          const voices = synth.getVoices();
+          const zh =
+            voices.find((v) => /zh-CN/i.test(v.lang) && /neural|online|natural|Xiaoxiao|Yunyang|Yaoyao|Huihui|晓|云|慧/i.test(v.name)) ||
+            voices.find((v) => /zh(-CN|_CN)?/i.test(v.lang)) ||
+            null;
+          if (zh) u.voice = zh;
+          u.onend = () => finish(true);
+          u.onerror = () => finish(false);
+          synth.cancel();
+          synth.speak(u);
+          // iOS 偶尔 pause 住，轻推一下
+          if (synth.paused) synth.resume();
+        } catch (_) {
+          finish(false);
+        }
       });
+    }
+
+    async function playToneVoice(text, opts) {
+      if (!text) return false;
+      try {
+        await playOnlineZh(text);
+        return true;
+      } catch (_) {
+        return playSynthZh(text, opts);
+      }
     }
 
     function speakFourTones(base) {
@@ -672,6 +764,7 @@
       pauseAt = dayProgress;
 
       let i = 0;
+      let gen = (speakFourTones._gen = (speakFourTones._gen || 0) + 1);
 
       // 多音字：用词组强制正确读音（喇叭仍主要听目标音节）
       const SPEAK_OVERRIDE = {
@@ -703,20 +796,38 @@
       };
 
       function finish() {
+        if (gen !== speakFourTones._gen) return;
+        clearTimeout(hardStop);
         hornSpeaking = false;
         hornToneIndex = -1;
         hornPulse = 0;
         hornAudio = null;
-        if (!quizOpen) {
-          dayPaused = false;
-          dayStart = performance.now() - pauseAt * DAY_MS;
-        }
+        releaseHornPause();
         if (today) setStory(today, dayProgress);
       }
 
+      // 整段播报最长约 12 秒，超时强制继续（防手机卡死）
+      const hardStop = setTimeout(() => {
+        if (gen !== speakFourTones._gen || !hornSpeaking) return;
+        if (hornTimer) {
+          clearTimeout(hornTimer);
+          hornTimer = 0;
+        }
+        try {
+          if (window.speechSynthesis) window.speechSynthesis.cancel();
+        } catch (_) {}
+        finish();
+      }, 12000);
+
       async function speakNext() {
-        if (!hornSpeaking || !today) return finish();
-        if (i >= 4) return finish();
+        if (gen !== speakFourTones._gen || !hornSpeaking || !today) {
+          clearTimeout(hardStop);
+          return finish();
+        }
+        if (i >= 4) {
+          clearTimeout(hardStop);
+          return finish();
+        }
 
         hornToneIndex = i;
         hornPulse = 1;
@@ -726,27 +837,24 @@
         const override = SPEAK_OVERRIDE[`${normalizeSyl(base)}|${i + 1}`];
         const spoken = override || hz;
 
-        // 画面显示「一声 mā（妈）」；声音只读汉字/词，避免系统把拼音念歪
-        if (spoken) {
-          try {
-            await playOnlineZh(spoken);
-          } catch (_) {
-            await playSynthZh(spoken, { rate: 0.82 });
-          }
-        } else {
-          // 无字可对：只报声调名（此音节普通话里常缺这个调）
-          await playSynthZh(TONE_NAMES[i], {
-            rate: [0.85, 0.95, 0.7, 1.0][i],
-            pitch: [1.3, 1.15, 0.7, 1.05][i],
-          });
+        // 画面一定推进；声音尽力而为，失败就静音过这一声
+        const voicePromise = spoken
+          ? playToneVoice(spoken, { rate: 0.82 })
+          : playToneVoice(TONE_NAMES[i], {
+              rate: [0.85, 0.95, 0.7, 1.0][i],
+              pitch: [1.3, 1.15, 0.7, 1.05][i],
+            });
+        // 无声时也至少展示一会儿声调
+        await Promise.race([voicePromise, waitMs(audioBlocked ? 700 : 2800)]);
+        if (gen !== speakFourTones._gen || !hornSpeaking) {
+          clearTimeout(hardStop);
+          return;
         }
 
         i += 1;
-        // 声调之间留一点空，方便小朋友听清
-        hornTimer = setTimeout(speakNext, spoken ? 520 : 380);
+        hornTimer = setTimeout(speakNext, spoken && !audioBlocked ? 420 : 280);
       }
 
-      // 预热语音列表
       if (window.speechSynthesis) window.speechSynthesis.getVoices();
       speakNext();
     }
@@ -938,7 +1046,7 @@
       }
 
       actors.forEach((a) => { a._wasOut = true; });
-      scheduleHornTones(1200);
+      scheduleHornTones(350);
     }
 
     /** 整体认读：声母韵母回家，音节从中央城堡出来自己玩 */
@@ -981,7 +1089,7 @@
           walkT: 0,
           _wasOut: true,
         });
-        scheduleHornTones(800);
+        scheduleHornTones(200);
       }, 900);
     }
 
@@ -1124,6 +1232,7 @@
     }
 
     function onAnswer(choice) {
+      unlockAudio();
       if (!quizOpen || quizStage !== "can" || !today || !today.quiz) return;
       const q = today.quiz;
       const btn = answerBtns.find((b) => b.dataset.answer === choice);
@@ -1171,6 +1280,7 @@
     }
 
     function onMedialPick(choice) {
+      unlockAudio();
       if (!quizOpen || quizStage !== "medial" || !today || !today.quiz) return;
       const q = today.quiz;
       const okList = (q.medials && q.medials.length) ? q.medials : (q.medial ? [q.medial] : []);
@@ -1718,11 +1828,15 @@
     }
 
     nextBtn.addEventListener("click", () => {
-      if (advancing || quizOpen || hornSpeaking) return;
+      unlockAudio();
+      if (advancing || quizOpen) return;
+      // 播报卡住时，点「下一天」可跳过并继续
+      if (hornSpeaking) stopHornSpeak();
       beginDay();
     });
 
     canvas.addEventListener("pointerdown", (e) => {
+      unlockAudio();
       if (quizOpen) return;
       const rect = canvas.getBoundingClientRect();
       const mx = e.clientX - rect.left;
@@ -1732,12 +1846,18 @@
       const dy = my - (L.horn.cy + 20);
       if (dx * dx + dy * dy < 70 * 70) {
         if (playMode === "duo" || playMode === "trio" || playMode === "zhengti") {
+          // 用户点喇叭：在手势内重播，并清掉「被拦截」标记再试一次
+          audioBlocked = false;
           scheduleHornTones(0);
         } else {
           hornPulse = 1;
         }
       }
     });
+
+    // 任意首次触摸也解锁（微信/Safari 更稳）
+    document.addEventListener("pointerdown", unlockAudio, { once: true, passive: true });
+    document.addEventListener("touchstart", unlockAudio, { once: true, passive: true });
 
     // 预热中文语音列表
     if (window.speechSynthesis) {
