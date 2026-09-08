@@ -301,11 +301,11 @@
       <div class="story">
         <div class="brand">拼音城堡</div>
         <p id="storyText">太阳快要升起了……</p>
-        <span class="tag zhengti" id="familyTag" hidden></span>
       </div>
       <div class="day-badge" style="min-width:72px">
-        <span>今日主角</span>
-        <strong id="starText">?</strong>
+        <span>答对了</span>
+        <strong id="correctCount">0</strong>
+        <span>次</span>
       </div>
     </div>
 
@@ -444,8 +444,7 @@
     const stage = document.getElementById("stage");
     const dayNumEl = document.getElementById("dayNum");
     const storyTextEl = document.getElementById("storyText");
-    const starTextEl = document.getElementById("starText");
-    const familyTagEl = document.getElementById("familyTag");
+    const correctCountEl = document.getElementById("correctCount");
     const nextBtn = document.getElementById("nextBtn");
     const quizEl = document.getElementById("quiz");
     const panelCan = document.getElementById("panelCan");
@@ -476,6 +475,7 @@
     let quizOpen = false;
     let quizStage = "can"; // can | medial
     let quizSolved = false;
+    let correctCount = 0; // 累计答对次数
     /** null=未定, duo=两人玩, trio=三人玩, zhengti=整体认读自己玩, none=不能玩 */
     let playMode = null;
     let hornSpeaking = false;
@@ -964,15 +964,16 @@
     function makeDay() {
       // 整体认读不直接从城堡出来，只通过「声母+韵母 → 整体认读」出现
       const pair = pickPairForQuiz();
-      const starIsShengmu = Math.random() < 0.5;
       return {
-        text: starIsShengmu ? pair.sm : pair.ym,
-        family: starIsShengmu ? "shengmu" : "yunmu",
-        alone: false,
         sm: pair.sm,
         ym: pair.ym,
         quiz: pair,
       };
+    }
+
+    function bumpCorrect() {
+      correctCount += 1;
+      if (correctCountEl) correctCountEl.textContent = String(correctCount);
     }
 
     // 与声母/韵母首次出场相同的步行时长（约占一天的 0.18）
@@ -1182,10 +1183,9 @@
 
     function spawnActors(day, L) {
       const plazaY = L.plaza.cy - 8;
-      const smIsStar = day.family === "shengmu";
       actors = [
         {
-          kind: smIsStar ? "star" : "partner",
+          kind: "partner",
           role: "sm",
           text: day.sm,
           family: "shengmu",
@@ -1200,7 +1200,7 @@
           scale: 1,
         },
         {
-          kind: smIsStar ? "partner" : "star",
+          kind: "partner",
           role: "ym",
           text: day.ym,
           family: "yunmu",
@@ -1322,12 +1322,8 @@
     }
 
     function setStory(day, progress) {
-      const fam = FAMILY[day.family];
-      familyTagEl.hidden = false;
-      familyTagEl.className = "tag " + day.family;
-      familyTagEl.textContent = fam.name;
-      starTextEl.textContent = day.text;
       dayNumEl.textContent = String(dayIndex);
+      if (correctCountEl) correctCountEl.textContent = String(correctCount);
 
       if (quizOpen && quizStage === "can") {
         storyTextEl.textContent = "声母在左、韵母在右——他们该怎么玩？";
@@ -1458,6 +1454,7 @@
         btn.classList.add("correct-flash");
         quizFeedbackEl.className = "feedback";
         answerBtns.forEach((b) => { b.disabled = true; });
+        bumpCorrect();
 
         if (choice === "ok") {
           quizFeedbackEl.textContent = "答对啦！请他们去广场玩吧！";
@@ -1509,6 +1506,7 @@
         q.syllable = (q.syllables && q.syllables[choice]) || writeSyllable(today.sm, choice, today.ym);
         btn.classList.add("correct-flash");
         medFeedbackEl.className = "feedback";
+        bumpCorrect();
         const extra = okList.length > 1
           ? `（也可以是 ${okList.filter((m) => m !== choice).join(" / ")}）`
           : "";
