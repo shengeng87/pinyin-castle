@@ -2227,6 +2227,9 @@
       const bodyRx = bellyW * 0.58;
       const bodyRy = 28;
       const sc = a.scale == null ? 1 : a.scale;
+      // 跳舞时影子钉在广场地面（用 ty），不随身体上下，表示在跳
+      const groundY = a.phase === "play" && a.ty != null ? a.ty : y;
+      const shadowY = groundY + bodyRy + 3;
 
       ctx.save();
       ctx.translate(x, y);
@@ -2239,10 +2242,10 @@
       }
       ctx.globalAlpha = alpha;
 
-      // 影子先画（与城堡一样在本体后面一层），但落在脚底前方地面上
+      // 影子先画（与城堡一样），跳舞时 y 固定在地面
       ctx.fillStyle = "rgba(42,58,74,0.18)";
       ctx.beginPath();
-      ctx.ellipse(x, y + bodyRy + 3, bodyRx * 0.88, 7, 0, 0, Math.PI * 2);
+      ctx.ellipse(x, shadowY, bodyRx * 0.88, 7, 0, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.fillStyle = a.color;
