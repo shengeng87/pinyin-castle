@@ -1415,8 +1415,8 @@
       if (today) {
         const L = layout();
         actors.forEach((a) => {
-          if (a.role === "sm") a.tx = playMode === "trio" ? L.plaza.cx - 88 : L.plaza.cx - 70;
-          else if (a.role === "ym") a.tx = playMode === "trio" ? L.plaza.cx + 88 : L.plaza.cx + 70;
+          if (a.role === "sm") a.tx = playMode === "trio" ? L.plaza.cx - 56 : L.plaza.cx - 48;
+          else if (a.role === "ym") a.tx = playMode === "trio" ? L.plaza.cx + 56 : L.plaza.cx + 48;
           else if (a.role === "jm" || a.role === "zt") a.tx = L.plaza.cx;
           a.ty = L.plaza.cy - 8;
         });
