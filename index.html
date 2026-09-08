@@ -965,16 +965,19 @@
       };
     }
 
-    function towerHome(family, L) {
-      // 门口外侧：出门起点
+    // 与声母/韵母首次出场相同的步行时长（约占一天的 0.18）
+    const WALK_MS = DAY_MS * 0.18;
+
+    function towerDoor(family, L) {
+      // 城堡大门门槛外侧
       const t = L.towers[family] || L.towers.zhengti;
-      return { x: t.cx, y: t.baseY - 12 };
+      return { x: t.cx, y: t.baseY - 4 };
     }
 
     function towerInside(family, L) {
-      // 进门后藏进塔身，看起来回到城堡里
+      // 大门洞内深处（进出都经过这里）
       const t = L.towers[family] || L.towers.zhengti;
-      return { x: t.cx, y: t.baseY - Math.min(58, t.h * 0.34) };
+      return { x: t.cx, y: t.baseY - Math.min(48, t.h * 0.26) };
     }
 
     function actorBellyW(text) {
@@ -982,12 +985,90 @@
       return Math.max(52, 28 + chars * 16);
     }
 
+    /** 从大门内走出到目标（经门槛） */
+    function startDoorExit(a, L, dest, delayMs) {
+      const inside = towerInside(a.family, L);
+      a.walkKind = "exit";
+      a.walkStart = performance.now() + (delayMs || 0);
+      a.walkFrom = inside;
+      a.walkVia = towerDoor(a.family, L);
+      a.walkTo = { x: dest.x, y: dest.y };
+      a.x = inside.x;
+      a.y = inside.y;
+      a.tx = dest.x;
+      a.ty = dest.y;
+      a.behindTower = true;
+      a.visible = true;
+      a.scale = 1;
+      a.goingHome = false;
+      a.phase = "exit";
+    }
+
+    /** 从当前位置经大门走回城堡内 */
+    function startDoorEnter(a, L) {
+      if (a.walkKind === "enter" && a.walkStart != null) return;
+      a.walkKind = "enter";
+      a.walkStart = performance.now();
+      a.walkFrom = { x: a.x, y: a.y };
+      a.walkVia = towerDoor(a.family, L);
+      a.walkTo = towerInside(a.family, L);
+      a.playing = false;
+      a.goingHome = true;
+      a.phase = "return";
+      a.behindTower = false;
+    }
+
+    /** 推进大门进出动画；返回 true 表示走完 */
+    function stepDoorWalk(a) {
+      if (a.walkStart == null || !a.walkKind) return false;
+      const now = performance.now();
+      if (now < a.walkStart) {
+        // 尚未出发：停在起点
+        a.x = a.walkFrom.x;
+        a.y = a.walkFrom.y;
+        a.behindTower = a.walkKind === "exit";
+        return false;
+      }
+      const u = easeOut(clamp((now - a.walkStart) / WALK_MS, 0, 1));
+      // 出门：先门内→门槛，再出门；回家：先到门槛，再进门内
+      const split = a.walkKind === "enter" ? 0.55 : 0.38;
+      if (u < split) {
+        const v = u / split;
+        a.x = lerp(a.walkFrom.x, a.walkVia.x, v);
+        a.y = lerp(a.walkFrom.y, a.walkVia.y, v);
+        a.behindTower = a.walkKind === "exit" ? true : v > 0.75;
+      } else {
+        const v = (u - split) / (1 - split);
+        a.x = lerp(a.walkVia.x, a.walkTo.x, v);
+        a.y = lerp(a.walkVia.y, a.walkTo.y, v);
+        if (a.walkKind === "exit") {
+          a.behindTower = v < 0.18;
+        } else {
+          a.behindTower = true;
+          a.scale = clamp(1 - v * 0.55, 0.35, 1);
+        }
+      }
+      if (u >= 1) {
+        a.x = a.walkTo.x;
+        a.y = a.walkTo.y;
+        a.walkStart = null;
+        a.walkKind = null;
+        if (a.goingHome) {
+          a.visible = false;
+          a.behindTower = true;
+        } else {
+          a.behindTower = false;
+          a.scale = 1;
+          a._wasOut = true;
+        }
+        return true;
+      }
+      return false;
+    }
+
     function spawnActors(day, L) {
       const plazaY = L.plaza.cy - 8;
-      const smHome = towerHome("shengmu", L);
-      const ymHome = towerHome("yunmu", L);
       const smIsStar = day.family === "shengmu";
-      // 声母、韵母都会出来见面；整体认读音节不会直接出场
       actors = [
         {
           kind: smIsStar ? "star" : "partner",
@@ -995,14 +1076,14 @@
           text: day.sm,
           family: "shengmu",
           color: FAMILY.shengmu.color,
-          x: smHome.x,
-          y: smHome.y,
-          tx: L.plaza.cx - 70,
+          x: 0,
+          y: 0,
+          tx: L.plaza.cx - 72,
           ty: plazaY,
           visible: true,
           phase: "exit",
-          appearAt: 0,
           playing: false,
+          scale: 1,
         },
         {
           kind: smIsStar ? "partner" : "star",
@@ -1010,43 +1091,38 @@
           text: day.ym,
           family: "yunmu",
           color: FAMILY.yunmu.color,
-          x: ymHome.x,
-          y: ymHome.y,
-          tx: L.plaza.cx + 70,
+          x: 0,
+          y: 0,
+          tx: L.plaza.cx + 72,
           ty: plazaY,
           visible: true,
           phase: "exit",
-          appearAt: 0.06,
           playing: false,
+          scale: 1,
         },
       ];
+      // 都从各自城堡大门走出，速度与原先出场一致
+      startDoorExit(actors[0], L, { x: L.plaza.cx - 72, y: plazaY }, 0);
+      startDoorExit(actors[1], L, { x: L.plaza.cx + 72, y: plazaY }, DAY_MS * 0.06);
     }
 
     function inviteFriendsToPlaza(mode) {
       playMode = mode;
       const L = layout();
       const plazaY = L.plaza.cy - 8;
-      // 手拉手：站得更近
       const gap = mode === "trio" ? 56 : 48;
 
       actors.forEach((a) => {
-        if (a.role === "sm") {
-          a.tx = L.plaza.cx - gap;
+        if (a.role === "sm" || a.role === "ym") {
+          a.tx = a.role === "sm" ? L.plaza.cx - gap : L.plaza.cx + gap;
           a.ty = plazaY;
           a.visible = true;
           a.playing = true;
           a.phase = "exit";
           a.goingHome = false;
-          a.walkT = 0;
-          a.scale = 1;
-        }
-        if (a.role === "ym") {
-          a.tx = L.plaza.cx + gap;
-          a.ty = plazaY;
-          a.visible = true;
-          a.playing = true;
-          a.phase = "exit";
-          a.goingHome = false;
+          a.walkKind = null;
+          a.walkStart = null;
+          a.behindTower = false;
           a.walkT = 0;
           a.scale = 1;
         }
@@ -1056,25 +1132,26 @@
 
       if (mode === "trio" && today.quiz && today.quiz.medial) {
         const m = today.quiz.medial;
-        const jmHome = towerHome("jiemu", L);
-        actors.push({
+        const jm = {
           kind: "partner",
           role: "jm",
           text: m,
           family: "jiemu",
           color: FAMILY.jiemu.color,
-          x: jmHome.x,
-          y: jmHome.y,
+          x: 0,
+          y: 0,
           tx: L.plaza.cx,
           ty: plazaY,
           visible: true,
           phase: "exit",
           playing: true,
           goingHome: false,
-          appearAt: 0,
           walkT: 0,
           scale: 1,
-        });
+        };
+        actors.push(jm);
+        // 介母也从蓝色城堡大门走出
+        startDoorExit(jm, L, { x: L.plaza.cx, y: plazaY }, 0);
       }
 
       actors.forEach((a) => { a._wasOut = true; });
@@ -1091,28 +1168,21 @@
 
       actors.forEach((a) => {
         if (a.role === "sm" || a.role === "ym") {
-          a.playing = false;
-          a.phase = "return";
-          a.goingHome = true;
-          const home = towerInside(a.family, L);
-          a.tx = home.x;
-          a.ty = home.y;
-          a.walkT = 0;
+          startDoorEnter(a, L);
         }
       });
 
       setTimeout(() => {
         if (!today || playMode !== "zhengti") return;
-        actors = actors.filter((a) => a.role === "zt");
-        const home = towerHome("zhengti", L);
-        actors.push({
+        actors = actors.filter((a) => a.role !== "sm" && a.role !== "ym");
+        const zt = {
           kind: "star",
           role: "zt",
           text: syl,
           family: "zhengti",
           color: FAMILY.zhengti.color,
-          x: home.x,
-          y: home.y,
+          x: 0,
+          y: 0,
           tx: L.plaza.cx,
           ty: plazaY,
           visible: true,
@@ -1122,23 +1192,18 @@
           walkT: 0,
           _wasOut: true,
           scale: 1,
-        });
+        };
+        actors.push(zt);
+        startDoorExit(zt, L, { x: L.plaza.cx, y: plazaY }, 0);
         scheduleHornTones(200);
-      }, 900);
+      }, WALK_MS);
     }
 
     function sendHomeNoPlay() {
       playMode = "none";
       stopHornSpeak();
       const L = layout();
-      actors.forEach((a) => {
-        a.playing = false;
-        a.phase = "return";
-        a.goingHome = true;
-        const home = towerInside(a.family, L);
-        a.tx = home.x;
-        a.ty = home.y;
-      });
+      actors.forEach((a) => startDoorEnter(a, L));
     }
 
     function setStory(day, progress) {
@@ -2107,60 +2172,41 @@
     function updateActors(progress, t) {
       const L = layout();
       actors.forEach((a) => {
-        // 答题前：声母韵母都走到广场两侧等待
-        if (playMode === null) {
-          const delay = a.appearAt || 0;
-          const home = towerHome(a.family, L);
-          const waitX = a.role === "sm" ? L.plaza.cx - 72 : L.plaza.cx + 72;
-          const waitY = L.plaza.cy - 8;
-          a.visible = true;
-          a.scale = 1;
-          if (progress < 0.08 + delay) {
-            a.x = home.x;
-            a.y = home.y;
-          } else {
-            const u = easeOut(clamp((progress - 0.08 - delay) / 0.18, 0, 1));
-            a.x = lerp(home.x, waitX, u);
-            a.y = lerp(home.y, waitY, u);
-            a._wasOut = true;
-          }
+        // 大门进出步行（出场 / 回家，速度与声母韵母首次出场一致）
+        if (a.walkKind && a.walkStart != null) {
+          const done = stepDoorWalk(a);
+          if (done && a.playing && !a.goingHome) a.phase = "play";
           return;
         }
 
-        // 回家：走进城堡门洞里再消失
+        if (playMode === null) return;
+
+        // 开始经大门回家
         const shouldReturn =
           a.goingHome ||
           progress >= 0.8 ||
           playMode === "none" ||
-          (playMode === "zhengti" && (a.role === "sm" || a.role === "ym"));
+          (playMode === "zhengti" && (a.role === "sm" || a.role === "ym") && !a.playing);
 
         if (shouldReturn && !(a.playing && progress < 0.8 && !a.goingHome)) {
-          a.playing = false;
-          a.phase = "return";
-          a.goingHome = true;
-          const inside = towerInside(a.family, L);
-          const speed = progress >= 0.9 ? 0.2 : 0.14;
-          a.x = lerp(a.x, inside.x, speed);
-          a.y = lerp(a.y, inside.y, speed);
-          const dist = Math.hypot(a.x - inside.x, a.y - inside.y);
-          a.scale = clamp(dist / 50, 0.25, 1);
-          a.visible = dist > 8;
+          startDoorEnter(a, L);
+          stepDoorWalk(a);
           return;
         }
 
-        // 玩耍中（两拼 / 三拼手拉手；整体认读自己玩）
+        // 已在广场：短距靠拢稍慢
         if (a.playing) {
           a.visible = true;
           a.scale = 1;
+          a.behindTower = false;
           a.walkT = (a.walkT || 0) + 0.04;
-          a.x = lerp(a.x, a.tx, 0.12);
-          a.y = lerp(a.y, a.ty, 0.12);
+          a.x = lerp(a.x, a.tx, 0.06);
+          a.y = lerp(a.y, a.ty, 0.06);
 
           const arrived = Math.hypot(a.x - a.tx, a.y - a.ty) < 8;
           if (arrived && progress < 0.8) {
             a.phase = "play";
             if (playMode === "duo" || playMode === "trio") {
-              // 同步蹦跳 + 轻微左右摇，像手拉手一起玩
               const sway = Math.sin(t * 2.1) * 5;
               a.x = a.tx + sway;
               a.y = a.ty + Math.sin(t * 4.2) * 5;
@@ -2228,14 +2274,14 @@
       // 连廊 → 回家精灵（走进门后被塔身盖住）→ 塔楼 → 广场 → 玩耍精灵+手拉手 → 喇叭
       drawWalls(L, T);
       drawGate(L);
-      actors.filter((a) => a.phase === "return" || a.goingHome).forEach((a) => drawActor(a, t));
+      actors.filter((a) => a.behindTower || a.phase === "return" || a.goingHome).forEach((a) => drawActor(a, t));
       drawTower(T.jiemu.cx, T.jiemu.baseY, T.jiemu.w, T.jiemu.h, FAMILY.jiemu.color, FAMILY.jiemu.soft, "介母", waveJm, 48, lit);
       drawTower(T.yunmu.cx, T.yunmu.baseY, T.yunmu.w, T.yunmu.h, FAMILY.yunmu.color, FAMILY.yunmu.soft, "韵母", waveYm, 48, lit);
       drawPlaza(L.plaza.cx, L.plaza.cy, L.plaza.rw, L.plaza.rh);
       drawTower(T.shengmu.cx, T.shengmu.baseY, T.shengmu.w, T.shengmu.h, FAMILY.shengmu.color, FAMILY.shengmu.soft, "声母", waveSm, 48, lit);
       drawTower(T.zhengti.cx, T.zhengti.baseY, T.zhengti.w, T.zhengti.h, FAMILY.zhengti.color, FAMILY.zhengti.soft, "整体认读", waveZt, 48, lit);
 
-      const activeActors = actors.filter((a) => a.phase !== "return" && !a.goingHome);
+      const activeActors = actors.filter((a) => !a.behindTower && a.phase !== "return" && !a.goingHome);
       activeActors.forEach((a) => drawActor(a, t));
       drawHandLinks(t);
       drawHorn(L.horn.cx, L.horn.cy, L.horn.baseY);
