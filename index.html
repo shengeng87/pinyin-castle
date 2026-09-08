@@ -1601,26 +1601,29 @@
         }
         const n = slots.length;
         const boxW = Math.min(220, Math.max(100, W * 0.12 * n));
+        // 声调条放在喇叭右上方，避开左侧拼写云朵
+        const barCx = Math.min(W - boxW / 2 - 8, cx + 36);
+        const barCy = cy - 18;
         ctx.restore();
         ctx.save();
         ctx.fillStyle = "rgba(255,255,255,0.94)";
-        roundRect(cx - boxW / 2, cy - 88, boxW, 62, 14);
+        roundRect(barCx - boxW / 2, barCy - 70, boxW, 62, 14);
         ctx.fill();
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         slots.forEach((slot, si) => {
           const i = slot.toneIndex;
-          const x = cx - boxW / 2 + (boxW * (si + 0.5)) / n;
+          const x = barCx - boxW / 2 + (boxW * (si + 0.5)) / n;
           const active = i === hornToneIndex;
           ctx.fillStyle = active ? "#c47a12" : "rgba(42,58,74,0.45)";
           ctx.font = `700 ${Math.max(10, W * 0.014)}px "Noto Sans SC", sans-serif`;
-          ctx.fillText(TONE_NAMES[i], x, cy - 66);
+          ctx.fillText(TONE_NAMES[i], x, barCy - 48);
           ctx.font = `700 ${Math.max(12, W * 0.018)}px "ZCOOL KuaiLe", sans-serif`;
           ctx.fillStyle = active ? "#e86a3c" : "#2a3a4a";
-          ctx.fillText(slot.form, x, cy - 48);
+          ctx.fillText(slot.form, x, barCy - 30);
           ctx.font = `700 ${Math.max(11, W * 0.016)}px "Noto Sans SC", sans-serif`;
           ctx.fillStyle = active ? "#2a9d8f" : "rgba(42,58,74,0.55)";
-          ctx.fillText(slot.hz, x, cy - 32);
+          ctx.fillText(slot.hz, x, barCy - 14);
         });
         ctx.restore();
         hornPulse = Math.max(0, hornPulse - 0.02);
@@ -1673,17 +1676,29 @@
       if (!today || !quizSolved || dayProgress < 0.4 || dayProgress > 0.82) return;
       if (playMode !== "duo" && playMode !== "trio" && playMode !== "zhengti") return;
       const q = today.quiz;
-      const cx = L.plaza.cx;
-      const cy = L.plaza.cy - 78;
-      ctx.fillStyle = "rgba(255,255,255,0.95)";
-      roundRect(cx - 90, cy - 22, 180, 44, 16);
+      // 放在大门上方偏左，避开右侧喇叭旁的声调/汉字条
+      const cx = L.plaza.cx - Math.min(70, W * 0.08);
+      const cy = L.ground - Math.min(168, H * 0.28);
+      const bob = Math.sin(t * 2.2) * 3;
+      const y = cy + bob;
+      const bw = Math.min(200, W * 0.42);
+      const bh = 48;
+
+      ctx.fillStyle = "rgba(255,255,255,0.96)";
+      // 小云朵外形
+      ctx.beginPath();
+      ctx.ellipse(cx - bw * 0.28, y + 4, bw * 0.22, bh * 0.42, 0, 0, Math.PI * 2);
+      ctx.ellipse(cx + bw * 0.28, y + 4, bw * 0.22, bh * 0.42, 0, 0, Math.PI * 2);
+      ctx.ellipse(cx, y - 2, bw * 0.38, bh * 0.55, 0, 0, Math.PI * 2);
+      ctx.ellipse(cx, y + 6, bw * 0.48, bh * 0.4, 0, 0, Math.PI * 2);
       ctx.fill();
+
       ctx.fillStyle = "#2a3a4a";
       ctx.font = `700 ${Math.max(16, W * 0.026)}px "ZCOOL KuaiLe", sans-serif`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      if (playMode === "duo" || playMode === "zhengti") ctx.fillText(q.syllable, cx, cy);
-      else ctx.fillText(`${today.sm}-${q.medial}-${today.ym}`, cx, cy);
+      if (playMode === "duo" || playMode === "zhengti") ctx.fillText(q.syllable, cx, y);
+      else ctx.fillText(`${today.sm}-${q.medial}-${today.ym}`, cx, y);
     }
 
     function updateActors(progress, t) {
@@ -1830,8 +1845,8 @@
       drawTower(T.zhengti.cx, T.zhengti.baseY, T.zhengti.w, T.zhengti.h, FAMILY.zhengti.color, FAMILY.zhengti.soft, "整体认读", swayZt, 56, lit);
 
       drawPlaza(L.plaza.cx, L.plaza.cy, L.plaza.rw, L.plaza.rh);
-      drawHorn(L.horn.cx, L.horn.cy);
       drawResultBubble(L, t);
+      drawHorn(L.horn.cx, L.horn.cy);
       actors.forEach((a) => drawActor(a, t));
 
       if (night > 0) {
