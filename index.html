@@ -1357,28 +1357,28 @@
 
     function layout() {
       const cx = W * 0.5;
-      const ground = H * 0.76;
+      const ground = H * 0.74;
       const tw = Math.min(108, W * 0.145);
       const th = Math.min(168, H * 0.29);
-      const baseY = ground - 10;
-      // 左→右：声母、介母、韵母、整体认读
+      // 外低内高：最外侧两座靠下围住广场，中间两座靠后靠上
+      const frontY = ground + Math.min(36, H * 0.045);
+      const backY = ground - Math.min(34, H * 0.05);
       const towers = {
-        shengmu: { cx: W * 0.11, baseY, w: tw, h: th },
-        jiemu: { cx: W * 0.33, baseY, w: tw, h: th },
-        yunmu: { cx: W * 0.67, baseY, w: tw, h: th },
-        zhengti: { cx: W * 0.89, baseY: ground - 32, w: Math.min(122, W * 0.165), h: Math.min(210, H * 0.35) },
+        shengmu: { cx: W * 0.09, baseY: frontY, w: tw, h: th },
+        jiemu: { cx: W * 0.31, baseY: backY, w: tw, h: th },
+        yunmu: { cx: W * 0.69, baseY: backY, w: tw, h: th },
+        zhengti: { cx: W * 0.91, baseY: frontY, w: tw, h: th },
       };
       return {
         towers,
         plaza: {
           cx,
-          cy: ground + H * 0.07,
+          cy: ground + H * 0.085,
           rw: Math.min(300, W * 0.44),
           rh: Math.min(105, H * 0.12),
         },
-        // 喇叭放右上（故事卡下方），避开广场小精灵
         horn: { cx: W * 0.86, cy: Math.max(110, H * 0.24) },
-        gate: { cx },
+        gate: { cx, baseY: (frontY + backY) / 2 },
         ground,
       };
     }
@@ -1723,7 +1723,7 @@
 
     function drawGate(L) {
       const gx = L.gate.cx;
-      const gy = L.ground;
+      const gy = L.gate.baseY != null ? L.gate.baseY : L.ground;
       // 门楼底座
       const gw = 96;
       const gh = 86;
@@ -1766,6 +1766,7 @@
     }
 
     function drawWalls(L, T) {
+      const gateY = (L.gate.baseY != null ? L.gate.baseY : L.ground) - 62;
       // 石墙带厚度感
       const drawSeg = (x1, y1, x2, y2) => {
         ctx.strokeStyle = "#9a7a58";
@@ -1781,7 +1782,6 @@
         ctx.moveTo(x1, y1 - 2);
         ctx.lineTo(x2, y2 - 2);
         ctx.stroke();
-        // 城垛小点
         const steps = 4;
         for (let i = 1; i < steps; i++) {
           const px = lerp(x1, x2, i / steps);
@@ -1791,10 +1791,23 @@
           ctx.fill();
         }
       };
-      drawSeg(T.shengmu.cx + T.shengmu.w * 0.4, T.shengmu.baseY - T.shengmu.h * 0.52, T.jiemu.cx - T.jiemu.w * 0.4, T.jiemu.baseY - T.jiemu.h * 0.52);
-      drawSeg(T.jiemu.cx + T.jiemu.w * 0.4, T.jiemu.baseY - T.jiemu.h * 0.48, L.gate.cx - 48, L.ground - 62);
-      drawSeg(L.gate.cx + 48, L.ground - 62, T.yunmu.cx - T.yunmu.w * 0.4, T.yunmu.baseY - T.yunmu.h * 0.48);
-      drawSeg(T.yunmu.cx + T.yunmu.w * 0.4, T.yunmu.baseY - T.yunmu.h * 0.52, T.zhengti.cx - T.zhengti.w * 0.4, T.zhengti.baseY - T.zhengti.h * 0.42);
+      // 沿地基高度差连成环抱广场的弧形城墙
+      drawSeg(
+        T.shengmu.cx + T.shengmu.w * 0.42, T.shengmu.baseY - T.shengmu.h * 0.45,
+        T.jiemu.cx - T.jiemu.w * 0.42, T.jiemu.baseY - T.jiemu.h * 0.5
+      );
+      drawSeg(
+        T.jiemu.cx + T.jiemu.w * 0.42, T.jiemu.baseY - T.jiemu.h * 0.48,
+        L.gate.cx - 48, gateY
+      );
+      drawSeg(
+        L.gate.cx + 48, gateY,
+        T.yunmu.cx - T.yunmu.w * 0.42, T.yunmu.baseY - T.yunmu.h * 0.48
+      );
+      drawSeg(
+        T.yunmu.cx + T.yunmu.w * 0.42, T.yunmu.baseY - T.yunmu.h * 0.5,
+        T.zhengti.cx - T.zhengti.w * 0.42, T.zhengti.baseY - T.zhengti.h * 0.45
+      );
     }
 
     function drawPlaza(cx, cy, rw, rh) {
@@ -2120,15 +2133,15 @@
       const swayZt = Math.sin(t * 1.6 + 2.1) * 0.08;
       const lit = night > 0.35;
 
-      drawWalls(L, T);
-      drawGate(L);
-
-      drawTower(T.shengmu.cx, T.shengmu.baseY, T.shengmu.w, T.shengmu.h, FAMILY.shengmu.color, FAMILY.shengmu.soft, "声母", swaySm, 48, lit);
+      // 先画靠后的介母/韵母，再城墙大门，再广场，最后外侧声母/整体认读（围住广场）
       drawTower(T.jiemu.cx, T.jiemu.baseY, T.jiemu.w, T.jiemu.h, FAMILY.jiemu.color, FAMILY.jiemu.soft, "介母", swayJm, 48, lit);
       drawTower(T.yunmu.cx, T.yunmu.baseY, T.yunmu.w, T.yunmu.h, FAMILY.yunmu.color, FAMILY.yunmu.soft, "韵母", swayYm, 48, lit);
-      drawTower(T.zhengti.cx, T.zhengti.baseY, T.zhengti.w, T.zhengti.h, FAMILY.zhengti.color, FAMILY.zhengti.soft, "整体认读", swayZt, 64, lit);
-
+      drawWalls(L, T);
+      drawGate(L);
       drawPlaza(L.plaza.cx, L.plaza.cy, L.plaza.rw, L.plaza.rh);
+      drawTower(T.shengmu.cx, T.shengmu.baseY, T.shengmu.w, T.shengmu.h, FAMILY.shengmu.color, FAMILY.shengmu.soft, "声母", swaySm, 48, lit);
+      drawTower(T.zhengti.cx, T.zhengti.baseY, T.zhengti.w, T.zhengti.h, FAMILY.zhengti.color, FAMILY.zhengti.soft, "整体认读", swayZt, 48, lit);
+
       drawResultBubble(L, t);
       actors.forEach((a) => drawActor(a, t));
       // 喇叭与声调条最后画，保证不被小精灵挡住
