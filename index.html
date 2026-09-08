@@ -1567,6 +1567,12 @@
     function drawTower(cx, baseY, w, h, color, soft, label, wave, roofH, lit) {
       const x = cx - w / 2;
       const y = baseY - h;
+      const roofBase = y;
+      const merlonCount = 5;
+      const pad = 3;
+      const slot = (w - pad * 2) / merlonCount;
+      const merlonW = slot * 0.58;
+      const merlonH = 18;
 
       // 地基阴影
       ctx.fillStyle = "rgba(42,58,74,0.18)";
@@ -1574,12 +1580,34 @@
       ctx.ellipse(cx, baseY + 6, w * 0.58, 10, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      // 城垛先画（在主体后面），塔身会盖住下半截
-      const merlonCount = 5;
-      const pad = 3;
-      const slot = (w - pad * 2) / merlonCount;
-      const merlonW = slot * 0.58;
-      const merlonH = 18;
+      // z 轴从后到前：顶部三角形 → 城垛 → 城堡主体
+      // 1) 尖顶屋顶（最后层）
+      ctx.fillStyle = "#8b3a1a";
+      ctx.beginPath();
+      ctx.moveTo(cx - w * 0.5, roofBase);
+      ctx.lineTo(cx, roofBase - roofH);
+      ctx.lineTo(cx + w * 0.5, roofBase);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = "#c45a2a";
+      ctx.beginPath();
+      ctx.moveTo(cx - w * 0.38, roofBase);
+      ctx.lineTo(cx, roofBase - roofH * 0.72);
+      ctx.lineTo(cx + w * 0.38, roofBase);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = "#e8c070";
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(cx, roofBase - roofH);
+      ctx.lineTo(cx, roofBase);
+      ctx.stroke();
+      ctx.fillStyle = "#f0d080";
+      ctx.beginPath();
+      ctx.arc(cx, roofBase - roofH - 3, 4.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 2) 城垛（中间层，盖住屋顶底边）
       for (let i = 0; i < merlonCount; i++) {
         const mx = x + pad + i * slot + (slot - merlonW) / 2;
         const mg = ctx.createLinearGradient(mx, y - merlonH, mx, y + 4);
@@ -1594,7 +1622,7 @@
         ctx.stroke();
       }
 
-      // 塔身主体（盖住城垛下半，不留纯色压条）
+      // 3) 城堡主体（最前层，盖住城垛下半）
       const g = ctx.createLinearGradient(x, y, x + w, y);
       g.addColorStop(0, soft);
       g.addColorStop(0.35, color);
@@ -1630,13 +1658,12 @@
       }
       ctx.restore();
 
-      // 墙体描边
       ctx.strokeStyle = softHex(color, -0.22);
       ctx.lineWidth = 2;
       roundRect(x, y, w, h, 12);
       ctx.stroke();
 
-      // 拱形窗户（带窗框）
+      // 拱形窗户
       const winW = Math.max(12, w * 0.18);
       const winH = Math.max(16, h * 0.14);
       const glow = lit ? "#ffe9a0" : "#fff8e0";
@@ -1673,32 +1700,6 @@
         }
       }
 
-      // 尖顶屋顶（底边紧贴塔身顶）
-      const roofBase = y;
-      ctx.fillStyle = "#8b3a1a";
-      ctx.beginPath();
-      ctx.moveTo(cx - w * 0.5, roofBase);
-      ctx.lineTo(cx, roofBase - roofH);
-      ctx.lineTo(cx + w * 0.5, roofBase);
-      ctx.closePath();
-      ctx.fill();
-      ctx.fillStyle = "#c45a2a";
-      ctx.beginPath();
-      ctx.moveTo(cx - w * 0.38, roofBase);
-      ctx.lineTo(cx, roofBase - roofH * 0.72);
-      ctx.lineTo(cx + w * 0.38, roofBase);
-      ctx.closePath();
-      ctx.fill();
-      ctx.strokeStyle = "#e8c070";
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      ctx.moveTo(cx, roofBase - roofH);
-      ctx.lineTo(cx, roofBase);
-      ctx.stroke();
-      ctx.fillStyle = "#f0d080";
-      ctx.beginPath();
-      ctx.arc(cx, roofBase - roofH - 3, 4.5, 0, Math.PI * 2);
-      ctx.fill();
       // 拱门
       const doorW = w * 0.34;
       const doorH = h * 0.3;
@@ -1718,7 +1719,6 @@
       ctx.lineTo(cx + doorW * 0.32, baseY);
       ctx.closePath();
       ctx.fill();
-      // 门钉
       ctx.fillStyle = "#d4a85a";
       for (let r = 0; r < 3; r++) {
         for (let c = 0; c < 2; c++) {
@@ -1728,7 +1728,7 @@
         }
       }
 
-      // 家族旗帜插在屋顶尖（城门牌已去掉，由旗帜标识家族）
+      // 旗帜插在屋顶尖（最前）
       drawBanner(cx, roofBase - roofH - 2, label.slice(0, 2), color, wave);
     }
 
