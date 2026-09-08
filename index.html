@@ -1646,19 +1646,19 @@
       ctx.fill();
 
       // z 轴从后到前：顶部三角形 → 城垛 → 城堡主体
-      // 1) 尖顶屋顶（最后层）
+      // 1) 尖顶屋顶（略窄，底角不从城垛两侧露出）
       ctx.fillStyle = "#8b3a1a";
       ctx.beginPath();
-      ctx.moveTo(cx - w * 0.5, roofBase);
+      ctx.moveTo(cx - w * 0.36, roofBase);
       ctx.lineTo(cx, roofBase - roofH);
-      ctx.lineTo(cx + w * 0.5, roofBase);
+      ctx.lineTo(cx + w * 0.36, roofBase);
       ctx.closePath();
       ctx.fill();
       ctx.fillStyle = "#c45a2a";
       ctx.beginPath();
-      ctx.moveTo(cx - w * 0.38, roofBase);
+      ctx.moveTo(cx - w * 0.26, roofBase);
       ctx.lineTo(cx, roofBase - roofH * 0.72);
-      ctx.lineTo(cx + w * 0.38, roofBase);
+      ctx.lineTo(cx + w * 0.26, roofBase);
       ctx.closePath();
       ctx.fill();
       ctx.strokeStyle = "#e8c070";
