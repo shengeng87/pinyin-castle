@@ -367,6 +367,7 @@
     ];
 
     // 整体认读 = 看起来像声母+韵母，但不能拼读，要整体认
+    // 注意：yu 对应 y+ü（ü 去点写成 u），不是 y+韵母 u
     const ZHENGTI_PAIRS = [
       ["zh", "i", "zhi"], ["ch", "i", "chi"], ["sh", "i", "shi"], ["r", "i", "ri"],
       ["z", "i", "zi"], ["c", "i", "ci"], ["s", "i", "si"],
@@ -401,8 +402,9 @@
       z: ["a","ai","ao","an","ang","e","ei","en","eng","i","ong","ou","u","ui","un"],
       c: ["a","ai","ao","an","ang","e","en","eng","i","ong","ou","u","ui","un"],
       s: ["a","ai","ao","an","ang","e","en","eng","i","ong","ou","u","ui","un"],
-      y: ["a","ao","an","ang","e","i","in","ing","ong","ou","u","ü","üe","ün","üan"],
-      w: ["a","ai","an","ang","ei","en","eng","o","u"],
+      // y/w：整体认读（yi/wu/yu/ye…）不进两拼；尤其 y+u ≠ yu（yu 是 ü 去点，整体认读）
+      y: ["a","ao","an","ang","ong","ou"],
+      w: ["a","ai","an","ang","ei","en","eng","o"],
     };
 
     // 三拼：声母 + 介母(i/u/ü) + 韵母
