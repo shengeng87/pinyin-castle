@@ -1034,13 +1034,42 @@
       if (a.walkStart == null || !a.walkKind) return false;
       const now = performance.now();
       if (now < a.walkStart) {
-        // 尚未出发：停在起点
         a.x = a.walkFrom.x;
         a.y = a.walkFrom.y;
         a.behindTower = a.walkKind === "exit";
+        if (a.walkKind === "approach") a.drawBehindSm = true;
         return false;
       }
       const u = easeOut(clamp((now - a.walkStart) / WALK_MS, 0, 1));
+
+      // 介母从声母背后走近广场（不经城堡门）
+      if (a.walkKind === "approach") {
+        const split = 0.42;
+        if (u < split) {
+          const v = u / split;
+          a.x = lerp(a.walkFrom.x, a.walkVia.x, v);
+          a.y = lerp(a.walkFrom.y, a.walkVia.y, v);
+        } else {
+          const v = (u - split) / (1 - split);
+          a.x = lerp(a.walkVia.x, a.walkTo.x, v);
+          a.y = lerp(a.walkVia.y, a.walkTo.y, v);
+        }
+        a.behindTower = false;
+        a.drawBehindSm = u < 0.55;
+        a.scale = 1;
+        if (u >= 1) {
+          a.x = a.walkTo.x;
+          a.y = a.walkTo.y;
+          a.walkStart = null;
+          a.walkKind = null;
+          a.drawBehindSm = false;
+          a.behindTower = false;
+          a._wasOut = true;
+          return true;
+        }
+        return false;
+      }
+
       // 出门：先门内→门槛，再出门；回家：先到门槛（一直在前），再进门内消失
       const split = a.walkKind === "enter" ? 0.55 : 0.38;
       if (u < split) {
@@ -1050,7 +1079,6 @@
         if (a.walkKind === "exit") {
           a.behindTower = true;
         } else {
-          // 走到家门前：始终在广场与城堡前面
           a.behindTower = false;
           a.scale = 1;
         }
@@ -1061,7 +1089,6 @@
         if (a.walkKind === "exit") {
           a.behindTower = v < 0.18;
         } else {
-          // 进门后：到门洞内再被城堡挡住并缩小消失
           a.behindTower = true;
           a.scale = clamp(1 - v * 0.55, 0.35, 1);
         }
@@ -1082,6 +1109,60 @@
         return true;
       }
       return false;
+    }
+
+    /** 某座城堡大门开合程度 0..1（精灵进出时自动开合） */
+    function doorOpenAmount(family) {
+      let open = 0;
+      const now = performance.now();
+      actors.forEach((a) => {
+        if (a.family !== family || !a.walkKind || a.walkStart == null) return;
+        if (a.walkKind === "approach") return;
+        if (now < a.walkStart) {
+          // 即将出门：提前开门
+          if (a.walkKind === "exit") open = Math.max(open, 0.55);
+          return;
+        }
+        const u = clamp((now - a.walkStart) / WALK_MS, 0, 1);
+        if (a.walkKind === "exit") {
+          if (u < 0.12) open = Math.max(open, u / 0.12);
+          else if (u < 0.55) open = Math.max(open, 1);
+          else open = Math.max(open, clamp(1 - (u - 0.55) / 0.35, 0, 1));
+        } else if (a.walkKind === "enter") {
+          if (u < 0.35) open = Math.max(open, clamp(u / 0.2, 0, 1));
+          else if (u < 0.7) open = Math.max(open, 1);
+          else open = Math.max(open, clamp(1 - (u - 0.7) / 0.3, 0, 1));
+        }
+      });
+      return clamp(open, 0, 1);
+    }
+
+    /** 介母从声母身后走上广场 */
+    function startFromBehindShengmu(a, L, dest, delayMs) {
+      const sm = actors.find((x) => x.role === "sm" && x.visible);
+      const plazaY = dest.y;
+      const from = sm
+        ? { x: sm.x - 10, y: sm.y - 22 }
+        : { x: L.plaza.cx - 70, y: plazaY - 30 };
+      const via = sm
+        ? { x: sm.x + 18, y: plazaY - 4 }
+        : { x: L.plaza.cx - 20, y: plazaY };
+      a.walkKind = "approach";
+      a.walkStart = performance.now() + (delayMs || 0);
+      a.walkFrom = from;
+      a.walkVia = via;
+      a.walkTo = { x: dest.x, y: dest.y };
+      a.x = from.x;
+      a.y = from.y;
+      a.tx = dest.x;
+      a.ty = dest.y;
+      a.behindTower = false;
+      a.drawBehindSm = true;
+      a.visible = true;
+      a.scale = 1;
+      a.goingHome = false;
+      a.phase = "exit";
+      a.playing = true;
     }
 
     /** 拉手伙伴是否都已到广场（三人模式须等介母到齐） */
@@ -1143,7 +1224,8 @@
       playMode = mode;
       const L = layout();
       const plazaY = L.plaza.cy - 8;
-      const gap = mode === "trio" ? 56 : 48;
+      // 两人挨紧拉手；三人稍分开给介母站中间
+      const gap = mode === "trio" ? 52 : 28;
 
       actors.forEach((a) => {
         if (a.role === "sm" || a.role === "ym") {
@@ -1183,8 +1265,8 @@
           scale: 1,
         };
         actors.push(jm);
-        // 介母也从蓝色城堡大门走出
-        startDoorExit(jm, L, { x: L.plaza.cx, y: plazaY }, 0);
+        // 介母从声母身后走上广场
+        startFromBehindShengmu(jm, L, { x: L.plaza.cx, y: plazaY }, 0);
       }
 
       actors.forEach((a) => { a._wasOut = true; });
@@ -1277,7 +1359,7 @@
         } else if (playMode === "duo") {
           storyTextEl.textContent = `可以一起玩！${day.sm} + ${day.ym} → ${q.syllable}（听喇叭读四声）`;
         } else if (playMode === "trio") {
-          storyTextEl.textContent = `介母「${q.medial}」从蓝色城堡出来牵手：${day.sm} + ${q.medial} + ${day.ym} → ${q.syllable}（听喇叭读四声）`;
+          storyTextEl.textContent = `介母「${q.medial}」从声母后面走上来牵手：${day.sm} + ${q.medial} + ${day.ym} → ${q.syllable}（听喇叭读四声）`;
         } else if (playMode === "zhengti") {
           storyTextEl.textContent = `整体认读「${q.syllable}」自己玩——听喇叭读四个声调！`;
         } else {
@@ -1515,8 +1597,9 @@
       if (today) {
         const L = layout();
         actors.forEach((a) => {
-          if (a.role === "sm") a.tx = playMode === "trio" ? L.plaza.cx - 56 : L.plaza.cx - 48;
-          else if (a.role === "ym") a.tx = playMode === "trio" ? L.plaza.cx + 56 : L.plaza.cx + 48;
+          if (a.role === "sm") a.tx = playMode === "trio" ? L.plaza.cx - 52 : L.plaza.cx - 28;
+          else if (a.role === "ym") a.tx = playMode === "trio" ? L.plaza.cx + 52 : L.plaza.cx + 28;
+          else if (a.role === "jm" || a.role === "zt") a.tx = L.plaza.cx;
           else if (a.role === "jm" || a.role === "zt") a.tx = L.plaza.cx;
           a.ty = L.plaza.cy - 8;
         });
@@ -1664,7 +1747,7 @@
       return `rgb(${adj(r)},${adj(g)},${adj(b)})`;
     }
 
-    function drawTower(cx, baseY, w, h, color, soft, label, wave, roofH, lit) {
+    function drawTower(cx, baseY, w, h, color, soft, label, wave, roofH, lit, doorOpen) {
       const x = cx - w / 2;
       const y = baseY - h;
       const roofBase = y;
@@ -1673,6 +1756,7 @@
       const slot = (w - pad * 2) / merlonCount;
       const merlonW = slot * 0.58;
       const merlonH = 18;
+      const open = clamp(doorOpen == null ? 0 : doorOpen, 0, 1);
 
       // 地基阴影
       ctx.fillStyle = "rgba(42,58,74,0.18)";
@@ -1800,10 +1884,11 @@
         }
       }
 
-      // 拱门
+      // 拱门（洞 + 可开合双扇门）
       const doorW = w * 0.34;
       const doorH = h * 0.3;
-      ctx.fillStyle = "#4a3220";
+      // 门洞暗影
+      ctx.fillStyle = "#2a1810";
       ctx.beginPath();
       ctx.moveTo(cx - doorW / 2, baseY);
       ctx.lineTo(cx - doorW / 2, baseY - doorH * 0.62);
@@ -1811,22 +1896,65 @@
       ctx.lineTo(cx + doorW / 2, baseY);
       ctx.closePath();
       ctx.fill();
-      ctx.fillStyle = "#2e1e12";
-      ctx.beginPath();
-      ctx.moveTo(cx - doorW * 0.32, baseY);
-      ctx.lineTo(cx - doorW * 0.32, baseY - doorH * 0.5);
-      ctx.arc(cx, baseY - doorH * 0.5, doorW * 0.32, Math.PI, 0);
-      ctx.lineTo(cx + doorW * 0.32, baseY);
-      ctx.closePath();
-      ctx.fill();
-      ctx.fillStyle = "#d4a85a";
-      for (let r = 0; r < 3; r++) {
-        for (let c = 0; c < 2; c++) {
-          ctx.beginPath();
-          ctx.arc(cx - doorW * 0.12 + c * doorW * 0.24, baseY - doorH * 0.18 - r * doorH * 0.14, 2.2, 0, Math.PI * 2);
-          ctx.fill();
+
+      // 双扇木门：open=0 合拢，open=1 向两侧打开
+      const leafMax = doorW * 0.5;
+      const leafW = Math.max(2, leafMax * (1 - open * 0.92));
+      const hingeL = cx - doorW / 2;
+      const hingeR = cx + doorW / 2;
+      const archTop = baseY - doorH * 0.62;
+      const drawLeaf = (left) => {
+        const hx = left ? hingeL : hingeR;
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(cx - doorW / 2, baseY);
+        ctx.lineTo(cx - doorW / 2, archTop);
+        ctx.arc(cx, archTop, doorW / 2, Math.PI, 0);
+        ctx.lineTo(cx + doorW / 2, baseY);
+        ctx.closePath();
+        ctx.clip();
+        const lg = ctx.createLinearGradient(hx, archTop, left ? hx + leafW : hx - leafW, baseY);
+        lg.addColorStop(0, "#8b5a2b");
+        lg.addColorStop(0.5, "#6b3f1a");
+        lg.addColorStop(1, "#4a2a12");
+        ctx.fillStyle = lg;
+        if (left) {
+          ctx.fillRect(hx, archTop - doorW * 0.15, leafW, doorH + doorW * 0.2);
+        } else {
+          ctx.fillRect(hx - leafW, archTop - doorW * 0.15, leafW, doorH + doorW * 0.2);
         }
-      }
+        // 门钉
+        if (leafW > 8) {
+          ctx.fillStyle = "#d4a85a";
+          const cols = 2;
+          for (let r = 0; r < 3; r++) {
+            for (let c = 0; c < cols; c++) {
+              const px = left
+                ? hx + leafW * (0.28 + c * 0.36)
+                : hx - leafW * (0.28 + c * 0.36);
+              const py = baseY - doorH * 0.18 - r * doorH * 0.14;
+              ctx.beginPath();
+              ctx.arc(px, py, 2.2, 0, Math.PI * 2);
+              ctx.fill();
+            }
+          }
+        }
+        // 门缝高光
+        ctx.strokeStyle = "rgba(255,220,160,0.25)";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        if (left) {
+          ctx.moveTo(hx + leafW - 1, archTop);
+          ctx.lineTo(hx + leafW - 1, baseY);
+        } else {
+          ctx.moveTo(hx - leafW + 1, archTop);
+          ctx.lineTo(hx - leafW + 1, baseY);
+        }
+        ctx.stroke();
+        ctx.restore();
+      };
+      drawLeaf(true);
+      drawLeaf(false);
 
       // 旗帜插在屋顶尖（最前）
       drawBanner(cx, roofBase - roofH - 2, label.slice(0, 2), color, wave);
@@ -2160,20 +2288,30 @@
       ctx.arc(x + 12, y - 24, 2.4, 0, Math.PI * 2);
       ctx.fill();
 
-      // 小手（全员到齐后再拉手）
+      // 小手
       if (syncPlay) {
+        // 双人/三人：靠边的手点（双人不画渐变连线，靠挨紧表示拉手）
         ctx.fillStyle = a.color;
         ctx.beginPath();
-        ctx.arc(x - bodyRx * 0.92, y + 2, 6, 0, Math.PI * 2);
-        ctx.arc(x + bodyRx * 0.92, y + 2, 6, 0, Math.PI * 2);
+        ctx.arc(x - bodyRx * 0.88, y + 2, 6, 0, Math.PI * 2);
+        ctx.arc(x + bodyRx * 0.88, y + 2, 6, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (a.phase === "play" && playMode === "zhengti") {
+        // 整体认读：两只手沿身体上下摇动玩耍
+        const hy = y + Math.sin(t * 5.5) * 12;
+        ctx.fillStyle = a.color;
+        ctx.beginPath();
+        ctx.arc(x - bodyRx * 0.95, hy, 5.5, 0, Math.PI * 2);
+        ctx.arc(x + bodyRx * 0.95, hy, 5.5, 0, Math.PI * 2);
         ctx.fill();
       }
       ctx.restore();
     }
 
     function drawHandLinks(t) {
-      if (!playmatesReady()) return;
-      const order = playMode === "trio" ? ["sm", "jm", "ym"] : ["sm", "ym"];
+      // 仅三人牵手时画短连线；双人挨紧靠手点即可
+      if (playMode !== "trio" || !playmatesReady()) return;
+      const order = ["sm", "jm", "ym"];
       const list = order
         .map((r) => actors.find((a) => a.role === r && a.visible && a.phase === "play"))
         .filter(Boolean);
@@ -2184,10 +2322,12 @@
         const b = list[i + 1];
         const aw = actorBellyW(a.text) * 0.58;
         const bw = actorBellyW(b.text) * 0.58;
-        const x1 = (a._drawX != null ? a._drawX : a.x) + aw * 0.92;
+        const x1 = (a._drawX != null ? a._drawX : a.x) + aw * 0.88;
         const y1 = (a._drawY != null ? a._drawY : a.y) + 2;
-        const x2 = (b._drawX != null ? b._drawX : b.x) - bw * 0.92;
+        const x2 = (b._drawX != null ? b._drawX : b.x) - bw * 0.88;
         const y2 = (b._drawY != null ? b._drawY : b.y) + 2;
+        // 已经挨得很近就不画线
+        if (x2 - x1 < 10) continue;
         const mx = (x1 + x2) / 2;
         const my = (y1 + y2) / 2 + Math.sin(t * 4.2 + i) * 3;
 
@@ -2328,13 +2468,15 @@
       drawHornPole(L.horn.cx, L.horn.cy, L.horn.baseY);
       drawGate(L);
       actors.filter((a) => a.behindTower).forEach((a) => drawActor(a, t));
-      drawTower(T.jiemu.cx, T.jiemu.baseY, T.jiemu.w, T.jiemu.h, FAMILY.jiemu.color, FAMILY.jiemu.soft, "介母", waveJm, 48, lit);
-      drawTower(T.yunmu.cx, T.yunmu.baseY, T.yunmu.w, T.yunmu.h, FAMILY.yunmu.color, FAMILY.yunmu.soft, "韵母", waveYm, 48, lit);
+      drawTower(T.jiemu.cx, T.jiemu.baseY, T.jiemu.w, T.jiemu.h, FAMILY.jiemu.color, FAMILY.jiemu.soft, "介母", waveJm, 48, lit, doorOpenAmount("jiemu"));
+      drawTower(T.yunmu.cx, T.yunmu.baseY, T.yunmu.w, T.yunmu.h, FAMILY.yunmu.color, FAMILY.yunmu.soft, "韵母", waveYm, 48, lit, doorOpenAmount("yunmu"));
       drawPlaza(L.plaza.cx, L.plaza.cy, L.plaza.rw, L.plaza.rh);
-      drawTower(T.shengmu.cx, T.shengmu.baseY, T.shengmu.w, T.shengmu.h, FAMILY.shengmu.color, FAMILY.shengmu.soft, "声母", waveSm, 48, lit);
-      drawTower(T.zhengti.cx, T.zhengti.baseY, T.zhengti.w, T.zhengti.h, FAMILY.zhengti.color, FAMILY.zhengti.soft, "整体认读", waveZt, 48, lit);
+      drawTower(T.shengmu.cx, T.shengmu.baseY, T.shengmu.w, T.shengmu.h, FAMILY.shengmu.color, FAMILY.shengmu.soft, "声母", waveSm, 48, lit, doorOpenAmount("shengmu"));
+      drawTower(T.zhengti.cx, T.zhengti.baseY, T.zhengti.w, T.zhengti.h, FAMILY.zhengti.color, FAMILY.zhengti.soft, "整体认读", waveZt, 48, lit, doorOpenAmount("zhengti"));
 
       const frontActors = actors.filter((a) => !a.behindTower);
+      // 介母从声母身后走过时，先画介母再画声母
+      frontActors.sort((a, b) => Number(!!b.drawBehindSm) - Number(!!a.drawBehindSm));
       frontActors.forEach((a) => drawActor(a, t));
       drawHandLinks(t);
       drawHorn(L.horn.cx, L.horn.cy);
