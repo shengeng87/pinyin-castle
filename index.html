@@ -577,6 +577,7 @@
     function unlockAudio() {
       if (audioUnlocked) return;
       audioUnlocked = true;
+      audioBlocked = false;
       try {
         // 静音短音：在用户点击手势里解锁 Audio / iOS 策略
         const a = new Audio(
@@ -590,12 +591,12 @@
         const synth = window.speechSynthesis;
         if (synth) {
           synth.getVoices();
-          const u = new SpeechSynthesisUtterance("。");
-          u.volume = 0;
+          const u = new SpeechSynthesisUtterance("嗯");
+          u.volume = 0.01;
           u.rate = 2;
           u.lang = "zh-CN";
+          // 不要立刻 cancel，否则部分浏览器会锁死后续 speak
           synth.speak(u);
-          synth.cancel();
         }
       } catch (_) {}
     }
@@ -723,7 +724,8 @@
     function playSynthZh(text, opts) {
       return new Promise((resolve) => {
         const synth = window.speechSynthesis;
-        if (!synth || audioBlocked) {
+        // 系统语音不受 online Audio 拦截标记影响
+        if (!synth) {
           resolve(false);
           return;
         }
@@ -737,8 +739,8 @@
         // 手机上 speechSynthesis 常不触发 onend，必须超时兜底
         const timer = setTimeout(() => {
           try { synth.cancel(); } catch (_) {}
-          finish(false);
-        }, 2200);
+          finish(true); // 超时也视为已播，避免整轮无声空转
+        }, 1800);
 
         try {
           const u = new SpeechSynthesisUtterance(text);
@@ -753,10 +755,14 @@
           if (zh) u.voice = zh;
           u.onend = () => finish(true);
           u.onerror = () => finish(false);
-          synth.cancel();
+          try { synth.cancel(); } catch (_) {}
           synth.speak(u);
           // iOS 偶尔 pause 住，轻推一下
-          if (synth.paused) synth.resume();
+          setTimeout(() => {
+            try {
+              if (synth.paused) synth.resume();
+            } catch (_) {}
+          }, 40);
         } catch (_) {
           finish(false);
         }
@@ -765,11 +771,15 @@
 
     async function playToneVoice(text, opts) {
       if (!text) return false;
+      // 优先系统中文语音（答题手势后延迟播报更稳）；在线 TTS 作增强
+      const ok = await playSynthZh(text, opts);
+      if (ok) return true;
+      if (audioBlocked) return false;
       try {
         await playOnlineZh(text);
         return true;
       } catch (_) {
-        return playSynthZh(text, opts);
+        return false;
       }
     }
 
@@ -2019,49 +2029,6 @@
       const pulse = hornSpeaking ? 0.55 + 0.45 * Math.abs(Math.sin(performance.now() / 140)) : hornPulse;
       const scale = 1 + pulse * 0.1;
 
-      // 四声汉字条：画在喇叭正上方
-      if ((hornSpeaking || hornToneSlots.length) && (playMode === "duo" || playMode === "trio" || playMode === "zhengti")) {
-        const slots = hornToneSlots;
-        if (slots.length) {
-          const n = slots.length;
-          const boxW = Math.min(260, Math.max(120, W * 0.14 * n));
-          const barCx = cx;
-          const barY = cy - 86;
-          ctx.save();
-          ctx.fillStyle = "rgba(255,255,255,0.96)";
-          roundRect(barCx - boxW / 2, barY, boxW, 66, 14);
-          ctx.fill();
-          ctx.strokeStyle = "rgba(240,160,26,0.5)";
-          ctx.lineWidth = 2;
-          roundRect(barCx - boxW / 2, barY, boxW, 66, 14);
-          ctx.stroke();
-          ctx.fillStyle = "rgba(255,255,255,0.96)";
-          ctx.beginPath();
-          ctx.moveTo(barCx - 10, barY + 66);
-          ctx.lineTo(barCx + 10, barY + 66);
-          ctx.lineTo(barCx, barY + 76);
-          ctx.closePath();
-          ctx.fill();
-          ctx.textAlign = "center";
-          ctx.textBaseline = "middle";
-          slots.forEach((slot, si) => {
-            const i = slot.toneIndex;
-            const x = barCx - boxW / 2 + (boxW * (si + 0.5)) / n;
-            const active = i === hornToneIndex;
-            ctx.fillStyle = active ? "#c47a12" : "rgba(42,58,74,0.45)";
-            ctx.font = `700 ${Math.max(10, W * 0.014)}px "Noto Sans SC", sans-serif`;
-            ctx.fillText(TONE_NAMES[i], x, barY + 14);
-            ctx.font = `700 ${Math.max(13, W * 0.02)}px "ZCOOL KuaiLe", sans-serif`;
-            ctx.fillStyle = active ? "#e86a3c" : "#2a3a4a";
-            ctx.fillText(slot.form, x, barY + 34);
-            ctx.font = `700 ${Math.max(12, W * 0.017)}px "Noto Sans SC", sans-serif`;
-            ctx.fillStyle = active ? "#2a9d8f" : "rgba(42,58,74,0.55)";
-            ctx.fillText(slot.hz, x, barY + 52);
-          });
-          ctx.restore();
-        }
-      }
-
       ctx.save();
       ctx.translate(cx, cy);
       ctx.scale(scale, scale);
@@ -2098,6 +2065,50 @@
       }
 
       ctx.restore();
+
+      // 四声汉字条：后画、位置更高，不被喇叭挡住
+      if ((hornSpeaking || hornToneSlots.length) && (playMode === "duo" || playMode === "trio" || playMode === "zhengti")) {
+        const slots = hornToneSlots;
+        if (slots.length) {
+          const n = slots.length;
+          const boxW = Math.min(260, Math.max(120, W * 0.14 * n));
+          const barCx = cx;
+          const barY = cy - 118;
+          ctx.save();
+          ctx.fillStyle = "rgba(255,255,255,0.96)";
+          roundRect(barCx - boxW / 2, barY, boxW, 66, 14);
+          ctx.fill();
+          ctx.strokeStyle = "rgba(240,160,26,0.5)";
+          ctx.lineWidth = 2;
+          roundRect(barCx - boxW / 2, barY, boxW, 66, 14);
+          ctx.stroke();
+          ctx.fillStyle = "rgba(255,255,255,0.96)";
+          ctx.beginPath();
+          ctx.moveTo(barCx - 10, barY + 66);
+          ctx.lineTo(barCx + 10, barY + 66);
+          ctx.lineTo(barCx, barY + 76);
+          ctx.closePath();
+          ctx.fill();
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          slots.forEach((slot, si) => {
+            const i = slot.toneIndex;
+            const x = barCx - boxW / 2 + (boxW * (si + 0.5)) / n;
+            const active = i === hornToneIndex;
+            ctx.fillStyle = active ? "#c47a12" : "rgba(42,58,74,0.45)";
+            ctx.font = `700 ${Math.max(10, W * 0.014)}px "Noto Sans SC", sans-serif`;
+            ctx.fillText(TONE_NAMES[i], x, barY + 14);
+            ctx.font = `700 ${Math.max(13, W * 0.02)}px "ZCOOL KuaiLe", sans-serif`;
+            ctx.fillStyle = active ? "#e86a3c" : "#2a3a4a";
+            ctx.fillText(slot.form, x, barY + 34);
+            ctx.font = `700 ${Math.max(12, W * 0.017)}px "Noto Sans SC", sans-serif`;
+            ctx.fillStyle = active ? "#2a9d8f" : "rgba(42,58,74,0.55)";
+            ctx.fillText(slot.hz, x, barY + 52);
+          });
+          ctx.restore();
+        }
+      }
+
       hornPulse = Math.max(0, hornPulse - 0.02);
     }
 
@@ -2363,7 +2374,7 @@
       const dy = my - L.horn.cy;
       const nearPole = Math.abs(dx) < 18 && my >= L.horn.cy - 20 && my <= (L.horn.baseY || L.horn.cy) + 8;
       // 城门顶喇叭（含杆、上方声调条）
-      if (dx * dx + dy * dy < 75 * 75 || nearPole || (Math.abs(dx) < 130 && dy > -100 && dy < 30)) {
+      if (dx * dx + dy * dy < 75 * 75 || nearPole || (Math.abs(dx) < 140 && dy > -140 && dy < 30)) {
         if (playMode === "duo" || playMode === "trio" || playMode === "zhengti") {
           // 用户点喇叭：在手势内重播，并清掉「被拦截」标记再试一次
           audioBlocked = false;
