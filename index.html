@@ -479,9 +479,10 @@
     /** null=未定, duo=两人玩, trio=三人玩, zhengti=整体认读自己玩, none=不能玩 */
     let playMode = null;
     let hornSpeaking = false;
-    let hornToneIndex = -1; // 0..3
+    let hornToneIndex = -1; // 0..3 原声调下标；无字声调不会播
     let hornTonedForms = [];
     let hornHanziForms = [];
+    let hornToneSlots = []; // 仅有汉字的声调槽
     let hornTimer = 0;
     let hornPulse = 0;
     let hornAudio = null;
@@ -521,6 +522,21 @@
         // already ju form
       }
       return arr;
+    }
+
+    /** 只保留有对应汉字的声调（无字的不显示、不播报） */
+    function toneSlots(base) {
+      const hanzi = toneHanziList(base);
+      const slots = [];
+      for (let i = 0; i < 4; i++) {
+        if (!hanzi[i]) continue;
+        slots.push({
+          toneIndex: i,
+          form: applyTone(base, i + 1),
+          hz: hanzi[i],
+        });
+      }
+      return slots;
     }
 
 
@@ -615,6 +631,7 @@
       hornSpeaking = false;
       hornToneIndex = -1;
       hornPulse = 0;
+      hornToneSlots = [];
       if (was) releaseHornPause();
     }
 
@@ -628,9 +645,11 @@
       stopHornSpeak();
       const syl = currentPlaySyllable();
       if (!syl) return;
-      hornTonedForms = [1, 2, 3, 4].map((n) => applyTone(syl, n));
-      hornHanziForms = toneHanziList(syl);
-      // 答题点击后手势已过期，手机上尽快播；失败也不阻塞
+      const slots = toneSlots(syl);
+      hornToneSlots = slots;
+      hornTonedForms = slots.map((s) => s.form);
+      hornHanziForms = slots.map((s) => s.hz);
+      if (!slots.length) return; // 四个声调都无常用字：不播、不展示
       const delay = delayMs == null ? 400 : delayMs;
       hornTimer = setTimeout(() => speakFourTones(syl), delay);
     }
@@ -755,16 +774,18 @@
     }
 
     function speakFourTones(base) {
-      const forms = [1, 2, 3, 4].map((n) => applyTone(base, n));
-      const hanzi = toneHanziList(base);
-      hornTonedForms = forms;
-      hornHanziForms = hanzi;
+      const slots = toneSlots(base);
+      hornToneSlots = slots;
+      hornTonedForms = slots.map((s) => s.form);
+      hornHanziForms = slots.map((s) => s.hz);
+      if (!slots.length) return;
+
       hornSpeaking = true;
-      hornToneIndex = 0;
+      hornToneIndex = slots[0].toneIndex;
       dayPaused = true;
       pauseAt = dayProgress;
 
-      let i = 0;
+      let step = 0;
       let gen = (speakFourTones._gen = (speakFourTones._gen || 0) + 1);
 
       // 多音字：用词组强制正确读音（喇叭仍主要听目标音节）
@@ -807,7 +828,7 @@
         if (today) setStory(today, dayProgress);
       }
 
-      // 整段播报最长约 12 秒，超时强制继续（防手机卡死）
+      // 按实际要播的声调数估超时，防手机卡死
       const hardStop = setTimeout(() => {
         if (gen !== speakFourTones._gen || !hornSpeaking) return;
         if (hornTimer) {
@@ -818,42 +839,36 @@
           if (window.speechSynthesis) window.speechSynthesis.cancel();
         } catch (_) {}
         finish();
-      }, 12000);
+      }, Math.min(12000, 2500 * slots.length + 2000));
 
       async function speakNext() {
         if (gen !== speakFourTones._gen || !hornSpeaking || !today) {
           clearTimeout(hardStop);
           return finish();
         }
-        if (i >= 4) {
+        if (step >= slots.length) {
           clearTimeout(hardStop);
           return finish();
         }
 
+        const slot = slots[step];
+        const i = slot.toneIndex;
         hornToneIndex = i;
         hornPulse = 1;
         if (today) setStory(today, dayProgress);
 
-        const hz = hanzi[i];
         const override = SPEAK_OVERRIDE[`${normalizeSyl(base)}|${i + 1}`];
-        const spoken = override || hz;
+        const spoken = override || slot.hz;
 
-        // 画面一定推进；声音尽力而为，失败就静音过这一声
-        const voicePromise = spoken
-          ? playToneVoice(spoken, { rate: 0.82 })
-          : playToneVoice(TONE_NAMES[i], {
-              rate: [0.85, 0.95, 0.7, 1.0][i],
-              pitch: [1.3, 1.15, 0.7, 1.05][i],
-            });
-        // 无声时也至少展示一会儿声调
+        const voicePromise = playToneVoice(spoken, { rate: 0.82 });
         await Promise.race([voicePromise, waitMs(audioBlocked ? 700 : 2800)]);
         if (gen !== speakFourTones._gen || !hornSpeaking) {
           clearTimeout(hardStop);
           return;
         }
 
-        i += 1;
-        hornTimer = setTimeout(speakNext, spoken && !audioBlocked ? 420 : 280);
+        step += 1;
+        hornTimer = setTimeout(speakNext, audioBlocked ? 280 : 420);
       }
 
       if (window.speechSynthesis) window.speechSynthesis.getVoices();
@@ -1137,10 +1152,12 @@
       } else if (progress < 0.78) {
         const q = day.quiz;
         if (hornSpeaking && hornToneIndex >= 0) {
-          const hz = hornHanziForms[hornToneIndex] || "";
+          const slot = hornToneSlots.find((s) => s.toneIndex === hornToneIndex);
+          const hz = slot ? slot.hz : "";
+          const form = slot ? slot.form : (hornTonedForms[hornToneIndex] || "");
           storyTextEl.textContent = hz
-            ? `喇叭播报：${TONE_NAMES[hornToneIndex]} ${hornTonedForms[hornToneIndex]}（${hz}）`
-            : `喇叭播报：${TONE_NAMES[hornToneIndex]} ${hornTonedForms[hornToneIndex] || ""}`;
+            ? `喇叭播报：${TONE_NAMES[hornToneIndex]} ${form}（${hz}）`
+            : `喇叭播报：${TONE_NAMES[hornToneIndex]} ${form}`;
         } else if (playMode === "duo") {
           storyTextEl.textContent = `可以一起玩！${day.sm} + ${day.ym} → ${q.syllable}（听喇叭读四声）`;
         } else if (playMode === "trio") {
@@ -1574,10 +1591,16 @@
         }
       }
 
-      // 四声展示条
-      if ((hornSpeaking || hornTonedForms.length) && (playMode === "duo" || playMode === "trio" || playMode === "zhengti")) {
-        const forms = hornTonedForms.length ? hornTonedForms : [1, 2, 3, 4].map((n) => applyTone(currentPlaySyllable() || "", n));
-        const boxW = Math.min(200, W * 0.42);
+      // 有汉字的声调展示条（无对应字的声调不显示）
+      if ((hornSpeaking || hornToneSlots.length) && (playMode === "duo" || playMode === "trio" || playMode === "zhengti")) {
+        const slots = hornToneSlots;
+        if (!slots.length) {
+          ctx.restore();
+          hornPulse = Math.max(0, hornPulse - 0.02);
+          return;
+        }
+        const n = slots.length;
+        const boxW = Math.min(220, Math.max(100, W * 0.12 * n));
         ctx.restore();
         ctx.save();
         ctx.fillStyle = "rgba(255,255,255,0.94)";
@@ -1585,20 +1608,19 @@
         ctx.fill();
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        forms.forEach((f, i) => {
-          const x = cx - boxW / 2 + (boxW * (i + 0.5)) / 4;
-          const hz = (hornHanziForms[i] || "");
-          ctx.fillStyle = i === hornToneIndex ? "#c47a12" : "rgba(42,58,74,0.45)";
+        slots.forEach((slot, si) => {
+          const i = slot.toneIndex;
+          const x = cx - boxW / 2 + (boxW * (si + 0.5)) / n;
+          const active = i === hornToneIndex;
+          ctx.fillStyle = active ? "#c47a12" : "rgba(42,58,74,0.45)";
           ctx.font = `700 ${Math.max(10, W * 0.014)}px "Noto Sans SC", sans-serif`;
           ctx.fillText(TONE_NAMES[i], x, cy - 66);
           ctx.font = `700 ${Math.max(12, W * 0.018)}px "ZCOOL KuaiLe", sans-serif`;
-          ctx.fillStyle = i === hornToneIndex ? "#e86a3c" : "#2a3a4a";
-          ctx.fillText(hz ? `${f}` : f, x, cy - 48);
-          if (hz) {
-            ctx.font = `700 ${Math.max(11, W * 0.016)}px "Noto Sans SC", sans-serif`;
-            ctx.fillStyle = i === hornToneIndex ? "#2a9d8f" : "rgba(42,58,74,0.55)";
-            ctx.fillText(hz, x, cy - 32);
-          }
+          ctx.fillStyle = active ? "#e86a3c" : "#2a3a4a";
+          ctx.fillText(slot.form, x, cy - 48);
+          ctx.font = `700 ${Math.max(11, W * 0.016)}px "Noto Sans SC", sans-serif`;
+          ctx.fillStyle = active ? "#2a9d8f" : "rgba(42,58,74,0.55)";
+          ctx.fillText(slot.hz, x, cy - 32);
         });
         ctx.restore();
         hornPulse = Math.max(0, hornPulse - 0.02);
