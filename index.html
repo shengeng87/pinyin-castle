@@ -2239,9 +2239,10 @@
       }
       ctx.globalAlpha = alpha;
 
-      ctx.fillStyle = "rgba(42,58,74,0.15)";
+      // 影子先画（与城堡一样在本体后面一层），但落在脚底前方地面上
+      ctx.fillStyle = "rgba(42,58,74,0.18)";
       ctx.beginPath();
-      ctx.ellipse(x, y + bodyRy * 0.78, bodyRx * 0.85, 8, 0, 0, Math.PI * 2);
+      ctx.ellipse(x, y + bodyRy + 3, bodyRx * 0.88, 7, 0, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.fillStyle = a.color;
