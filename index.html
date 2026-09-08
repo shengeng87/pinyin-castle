@@ -1723,20 +1723,7 @@
         }
       }
 
-      // 族名牌
-      ctx.fillStyle = "rgba(255,255,255,0.95)";
-      roundRect(cx - w * 0.4, y + h * 0.56, w * 0.8, 30, 10);
-      ctx.fill();
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 2;
-      roundRect(cx - w * 0.4, y + h * 0.56, w * 0.8, 30, 10);
-      ctx.stroke();
-      ctx.fillStyle = color;
-      ctx.font = `700 ${Math.max(11, w * (label.length > 2 ? 0.11 : 0.145))}px "ZCOOL KuaiLe", sans-serif`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(label, cx, y + h * 0.56 + 16);
-      // 家族旗帜插在屋顶尖
+      // 家族旗帜插在屋顶尖（城门牌已去掉，由旗帜标识家族）
       drawBanner(cx, roofBase - roofH - 2, label.slice(0, 2), color, wave);
     }
 
@@ -2008,29 +1995,36 @@
       const bob = Math.sin(t * 6 + a.x * 0.01) * (a.phase === "play" ? 5 : 2);
       const x = a.x;
       const y = a.y + bob;
+      const chars = Math.max(1, String(a.text || "").length);
+      // 肚子随字母变宽，保证 zh / üan 等也能完整显示
+      const bellyW = Math.max(52, 28 + chars * 16);
+      const bellyH = 34;
+      const bodyRx = bellyW * 0.58;
+      const bodyRy = 28;
 
       ctx.fillStyle = "rgba(42,58,74,0.15)";
       ctx.beginPath();
-      ctx.ellipse(x, a.ty + 28, 22, 7, 0, 0, Math.PI * 2);
+      ctx.ellipse(x, a.ty + 30, bodyRx * 0.85, 8, 0, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.fillStyle = a.color;
       ctx.beginPath();
-      ctx.ellipse(x, y, 28, 24, 0, 0, Math.PI * 2);
+      ctx.ellipse(x, y, bodyRx, bodyRy, 0, 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillStyle = "rgba(255,255,255,0.92)";
-      roundRect(x - 22, y - 14, 44, 28, 12);
+      ctx.fillStyle = "rgba(255,255,255,0.95)";
+      roundRect(x - bellyW / 2, y - bellyH / 2, bellyW, bellyH, 14);
       ctx.fill();
       ctx.fillStyle = a.color;
-      ctx.font = `700 ${Math.max(15, 40 / Math.max(1, a.text.length * 0.55))}px "ZCOOL KuaiLe", sans-serif`;
+      const fontSize = Math.max(14, Math.min(22, (bellyW - 10) / Math.max(1, chars * 0.72)));
+      ctx.font = `700 ${fontSize}px "ZCOOL KuaiLe", sans-serif`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(a.text, x, y + 1);
 
       ctx.fillStyle = "#2a3a4a";
       ctx.beginPath();
-      ctx.arc(x - 10, y - 22, 2.2, 0, Math.PI * 2);
-      ctx.arc(x + 10, y - 22, 2.2, 0, Math.PI * 2);
+      ctx.arc(x - 12, y - 24, 2.4, 0, Math.PI * 2);
+      ctx.arc(x + 12, y - 24, 2.4, 0, Math.PI * 2);
       ctx.fill();
     }
 
