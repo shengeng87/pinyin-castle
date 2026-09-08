@@ -1370,6 +1370,7 @@
         zhengti: { cx: W * 0.91, baseY: frontY, w: tw, h: th },
       };
       const gateBaseY = (frontY + backY) / 2;
+      const gateTop = gateBaseY - 98; // 城门雉堞顶，喇叭杆底插在这里
       return {
         towers,
         plaza: {
@@ -1378,9 +1379,9 @@
           rw: Math.min(300, W * 0.44),
           rh: Math.min(105, H * 0.12),
         },
-        // 喇叭装在介母与韵母之间的城门顶上
         gate: { cx, baseY: gateBaseY },
-        horn: { cx: cx + 6, cy: gateBaseY - 98 },
+        // cy=喇叭本体；baseY=杆子底部插在城门上
+        horn: { cx: cx + 4, cy: gateTop - 78, baseY: gateTop },
         ground,
       };
     }
@@ -1491,26 +1492,39 @@
     }
 
     function drawBanner(x, y, text, color, sway) {
+      // (x,y) = 旗杆底部，插在城堡屋顶尖上；旗杆向上升起
       ctx.save();
       ctx.translate(x, y);
       ctx.rotate(sway);
+      // 底座小球
+      ctx.fillStyle = "#e8c070";
+      ctx.beginPath();
+      ctx.arc(0, 2, 4, 0, Math.PI * 2);
+      ctx.fill();
+      // 旗杆向上
       ctx.strokeStyle = "#6b4a2e";
       ctx.lineWidth = 3.5;
+      ctx.lineCap = "round";
       ctx.beginPath();
-      ctx.moveTo(0, -10);
-      ctx.lineTo(0, 58);
+      ctx.moveTo(0, 0);
+      ctx.lineTo(0, -64);
       ctx.stroke();
-      // 旗布
-      const fg = ctx.createLinearGradient(2, 0, 58, 40);
+      // 杆顶珠
+      ctx.fillStyle = "#f0d080";
+      ctx.beginPath();
+      ctx.arc(0, -64, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+      // 旗布挂在杆上部
+      const fg = ctx.createLinearGradient(2, -60, 56, -20);
       fg.addColorStop(0, softHex(color, 0.25));
       fg.addColorStop(0.5, color);
       fg.addColorStop(1, softHex(color, -0.12));
       ctx.fillStyle = fg;
       ctx.beginPath();
-      ctx.moveTo(2, 2);
-      ctx.lineTo(58, 12);
-      ctx.lineTo(52, 38);
-      ctx.lineTo(2, 46);
+      ctx.moveTo(2, -58);
+      ctx.quadraticCurveTo(28, -62, 56, -50);
+      ctx.lineTo(52, -24);
+      ctx.quadraticCurveTo(28, -32, 2, -28);
       ctx.closePath();
       ctx.fill();
       ctx.strokeStyle = "rgba(255,255,255,0.35)";
@@ -1520,7 +1534,7 @@
       ctx.font = `700 ${Math.max(11, W * 0.018)}px "Noto Sans SC", sans-serif`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(text, 30, 24);
+      ctx.fillText(text, 28, -42);
       ctx.restore();
     }
 
@@ -1672,7 +1686,7 @@
       ctx.moveTo(cx, roofBase - roofH);
       ctx.lineTo(cx, roofBase - 4);
       ctx.stroke();
-      // 宝顶
+      // 宝顶（旗帜插在宝顶处）
       ctx.fillStyle = "#f0d080";
       ctx.beginPath();
       ctx.arc(cx, roofBase - roofH - 3, 4.5, 0, Math.PI * 2);
@@ -1720,7 +1734,8 @@
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(label, cx, y + h * 0.56 + 16);
-      drawBanner(cx + w * 0.48, y - 18, label.slice(0, 2), color, sway);
+      // 家族旗帜插在屋顶尖
+      drawBanner(cx, roofBase - roofH - 2, label.slice(0, 2), color, sway);
     }
 
     function drawGate(L) {
@@ -1875,9 +1890,10 @@
       ctx.stroke();
     }
 
-    function drawHorn(cx, cy) {
+    function drawHorn(cx, cy, baseY) {
       const pulse = hornSpeaking ? 0.55 + 0.45 * Math.abs(Math.sin(performance.now() / 140)) : hornPulse;
       const scale = 1 + pulse * 0.1;
+      const plantY = baseY != null ? baseY : cy + 36;
 
       // 四声汉字条：画在喇叭正上方
       if ((hornSpeaking || hornToneSlots.length) && (playMode === "duo" || playMode === "trio" || playMode === "zhengti")) {
@@ -1886,7 +1902,7 @@
           const n = slots.length;
           const boxW = Math.min(260, Math.max(120, W * 0.14 * n));
           const barCx = cx;
-          const barY = cy - 92;
+          const barY = cy - 86;
           ctx.save();
           ctx.fillStyle = "rgba(255,255,255,0.96)";
           roundRect(barCx - boxW / 2, barY, boxW, 66, 14);
@@ -1895,7 +1911,6 @@
           ctx.lineWidth = 2;
           roundRect(barCx - boxW / 2, barY, boxW, 66, 14);
           ctx.stroke();
-          // 小尖角指向喇叭
           ctx.fillStyle = "rgba(255,255,255,0.96)";
           ctx.beginPath();
           ctx.moveTo(barCx - 10, barY + 66);
@@ -1923,33 +1938,53 @@
         }
       }
 
+      // 长杆：底部插在城门顶，向上撑起喇叭
       ctx.save();
+      ctx.strokeStyle = "#6b4a2e";
+      ctx.lineWidth = 5;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(cx, plantY);
+      ctx.lineTo(cx, cy + 10);
+      ctx.stroke();
+      ctx.strokeStyle = "#8b5a2b";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(cx, plantY);
+      ctx.lineTo(cx, cy + 10);
+      ctx.stroke();
+      // 杆底固定环
+      ctx.fillStyle = "#c4a882";
+      ctx.beginPath();
+      ctx.ellipse(cx, plantY + 2, 10, 5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#6b4a2e";
+      ctx.beginPath();
+      ctx.ellipse(cx, plantY, 7, 3.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+
       ctx.translate(cx, cy);
       ctx.scale(scale, scale);
-      // 短立柱固定在城门顶
-      ctx.fillStyle = "#6b4a2e";
-      roundRect(-5, 8, 10, 28, 3);
-      ctx.fill();
+      // 喇叭本体
       ctx.fillStyle = "#8b5a2b";
-      roundRect(-6, -8, 12, 22, 4);
+      roundRect(-7, -6, 14, 20, 4);
       ctx.fill();
-      // 喇叭朝右上扬起
       ctx.fillStyle = "#f0a01a";
       ctx.beginPath();
-      ctx.moveTo(-6, -6);
-      ctx.lineTo(42, -32);
-      ctx.lineTo(42, 18);
-      ctx.lineTo(-6, 8);
+      ctx.moveTo(-6, -4);
+      ctx.lineTo(44, -30);
+      ctx.lineTo(44, 16);
+      ctx.lineTo(-6, 10);
       ctx.closePath();
       ctx.fill();
       ctx.fillStyle = "#ffe6a8";
       ctx.beginPath();
-      ctx.ellipse(42, -6, 7, 24, 0, 0, Math.PI * 2);
+      ctx.ellipse(44, -6, 7, 24, 0, 0, Math.PI * 2);
       ctx.fill();
       ctx.strokeStyle = "#c47a12";
       ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.ellipse(42, -6, 7, 24, 0, 0, Math.PI * 2);
+      ctx.ellipse(44, -6, 7, 24, 0, 0, Math.PI * 2);
       ctx.stroke();
 
       if (pulse > 0.05) {
@@ -1957,7 +1992,7 @@
         ctx.lineWidth = 3;
         for (let i = 1; i <= 3; i++) {
           ctx.beginPath();
-          ctx.arc(52, -6, 10 + i * 11 * pulse, -0.85, 0.65);
+          ctx.arc(54, -6, 10 + i * 11 * pulse, -0.85, 0.65);
           ctx.stroke();
         }
       }
@@ -2159,7 +2194,7 @@
       drawResultBubble(L, t);
       actors.forEach((a) => drawActor(a, t));
       // 喇叭与声调条最后画，保证不被小精灵挡住
-      drawHorn(L.horn.cx, L.horn.cy);
+      drawHorn(L.horn.cx, L.horn.cy, L.horn.baseY);
 
       if (night > 0) {
         ctx.fillStyle = `rgba(10,18,36,${0.45 * night})`;
@@ -2194,8 +2229,9 @@
       const L = layout();
       const dx = mx - L.horn.cx;
       const dy = my - L.horn.cy;
-      // 城门顶喇叭点击区域（含上方声调条下沿）
-      if (dx * dx + dy * dy < 70 * 70 || (Math.abs(dx) < 120 && dy > -100 && dy < 40)) {
+      const nearPole = Math.abs(dx) < 18 && my >= L.horn.cy - 20 && my <= (L.horn.baseY || L.horn.cy) + 8;
+      // 城门顶喇叭（含杆、上方声调条）
+      if (dx * dx + dy * dy < 75 * 75 || nearPole || (Math.abs(dx) < 130 && dy > -100 && dy < 30)) {
         if (playMode === "duo" || playMode === "trio" || playMode === "zhengti") {
           // 用户点喇叭：在手势内重播，并清掉「被拦截」标记再试一次
           audioBlocked = false;
