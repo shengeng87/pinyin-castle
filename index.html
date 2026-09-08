@@ -996,38 +996,44 @@
       return Math.max(52, 28 + chars * 16);
     }
 
-    /** 从大门内走出到目标（经门槛） */
+    /** 从大门走出到目标：门前淡入，始终在城堡前面 */
     function startDoorExit(a, L, dest, delayMs) {
-      const inside = towerInside(a.family, L);
+      const door = towerDoor(a.family, L);
       a.walkKind = "exit";
       a.walkStart = performance.now() + (delayMs || 0);
-      a.walkFrom = inside;
-      a.walkVia = towerDoor(a.family, L);
+      a.walkFrom = { x: door.x, y: door.y };
+      a.walkVia = { x: door.x, y: door.y };
       a.walkTo = { x: dest.x, y: dest.y };
-      a.x = inside.x;
-      a.y = inside.y;
+      a.x = door.x;
+      a.y = door.y;
       a.tx = dest.x;
       a.ty = dest.y;
-      a.behindTower = true;
+      a.behindTower = false;
       a.visible = true;
       a.scale = 1;
+      a.alpha = 0;
       a.goingHome = false;
       a.phase = "exit";
+      // 介母出门后整段走在声母精灵后面（z）
+      a.drawBehindSm = a.role === "jm";
     }
 
-    /** 从当前位置经大门走回城堡内 */
+    /** 走回大门：门前淡出，始终在城堡前面 */
     function startDoorEnter(a, L) {
       if (a.walkKind === "enter" && a.walkStart != null) return;
+      const door = towerDoor(a.family, L);
       a.walkKind = "enter";
       a.walkStart = performance.now();
       a.walkFrom = { x: a.x, y: a.y };
-      a.walkVia = towerDoor(a.family, L);
-      a.walkTo = towerInside(a.family, L);
+      a.walkVia = { x: door.x, y: door.y };
+      a.walkTo = { x: door.x, y: door.y };
       a.playing = false;
       a.goingHome = true;
       a.phase = "return";
-      a.behindTower = false; // 回家途中走在广场/城堡前面
+      a.behindTower = false;
       a.scale = 1;
+      a.alpha = a.alpha == null ? 1 : a.alpha;
+      a.drawBehindSm = false;
     }
 
     /** 推进大门进出动画；返回 true 表示走完 */
@@ -1037,78 +1043,73 @@
       if (now < a.walkStart) {
         a.x = a.walkFrom.x;
         a.y = a.walkFrom.y;
-        a.behindTower = a.walkKind === "exit";
-        if (a.walkKind === "approach") a.drawBehindSm = true;
+        a.behindTower = false;
+        if (a.walkKind === "exit") a.alpha = 0;
         return false;
       }
       const u = easeOut(clamp((now - a.walkStart) / WALK_MS, 0, 1));
 
-      // 介母从声母背后走近广场（不经城堡门）
-      if (a.walkKind === "approach") {
-        const split = 0.42;
-        if (u < split) {
-          const v = u / split;
-          a.x = lerp(a.walkFrom.x, a.walkVia.x, v);
-          a.y = lerp(a.walkFrom.y, a.walkVia.y, v);
+      if (a.walkKind === "exit") {
+        // 0~0.28：停在大门口淡入；之后走到广场
+        const fadeEnd = 0.28;
+        if (u < fadeEnd) {
+          const v = u / fadeEnd;
+          a.x = a.walkFrom.x;
+          a.y = a.walkFrom.y;
+          a.alpha = v;
         } else {
-          const v = (u - split) / (1 - split);
+          const v = (u - fadeEnd) / (1 - fadeEnd);
           a.x = lerp(a.walkVia.x, a.walkTo.x, v);
           a.y = lerp(a.walkVia.y, a.walkTo.y, v);
+          a.alpha = 1;
         }
         a.behindTower = false;
-        a.drawBehindSm = u < 0.55;
         a.scale = 1;
+        if (a.role === "jm") a.drawBehindSm = true;
         if (u >= 1) {
           a.x = a.walkTo.x;
           a.y = a.walkTo.y;
           a.walkStart = null;
           a.walkKind = null;
-          a.drawBehindSm = false;
+          a.alpha = 1;
           a.behindTower = false;
+          a.drawBehindSm = a.role === "jm"; // 到广场站定后仍可被声母挡住一点，play 时清掉
           a._wasOut = true;
           return true;
         }
         return false;
       }
 
-      // 出门：先门内→门槛，再出门；回家：先到门槛（一直在前），再进门内消失
-      const split = a.walkKind === "enter" ? 0.55 : 0.38;
-      if (u < split) {
-        const v = u / split;
-        a.x = lerp(a.walkFrom.x, a.walkVia.x, v);
-        a.y = lerp(a.walkFrom.y, a.walkVia.y, v);
-        if (a.walkKind === "exit") {
-          a.behindTower = true;
+      if (a.walkKind === "enter") {
+        // 0~0.62：走到大门口；之后停在门前淡出
+        const arrive = 0.62;
+        if (u < arrive) {
+          const v = u / arrive;
+          a.x = lerp(a.walkFrom.x, a.walkVia.x, v);
+          a.y = lerp(a.walkFrom.y, a.walkVia.y, v);
+          a.alpha = 1;
         } else {
-          a.behindTower = false;
-          a.scale = 1;
+          const v = (u - arrive) / (1 - arrive);
+          a.x = a.walkVia.x;
+          a.y = a.walkVia.y;
+          a.alpha = 1 - v;
         }
-      } else {
-        const v = (u - split) / (1 - split);
-        a.x = lerp(a.walkVia.x, a.walkTo.x, v);
-        a.y = lerp(a.walkVia.y, a.walkTo.y, v);
-        if (a.walkKind === "exit") {
-          a.behindTower = v < 0.18;
-        } else {
-          a.behindTower = true;
-          a.scale = clamp(1 - v * 0.55, 0.35, 1);
-        }
-      }
-      if (u >= 1) {
-        a.x = a.walkTo.x;
-        a.y = a.walkTo.y;
-        a.walkStart = null;
-        a.walkKind = null;
-        if (a.goingHome) {
+        a.behindTower = false;
+        a.scale = 1;
+        a.drawBehindSm = false;
+        if (u >= 1) {
+          a.x = a.walkTo.x;
+          a.y = a.walkTo.y;
+          a.walkStart = null;
+          a.walkKind = null;
+          a.alpha = 0;
           a.visible = false;
-          a.behindTower = true;
-        } else {
           a.behindTower = false;
-          a.scale = 1;
-          a._wasOut = true;
+          return true;
         }
-        return true;
+        return false;
       }
+
       return false;
     }
 
@@ -1118,52 +1119,24 @@
       const now = performance.now();
       actors.forEach((a) => {
         if (a.family !== family || !a.walkKind || a.walkStart == null) return;
-        if (a.walkKind === "approach") return;
         if (now < a.walkStart) {
-          // 即将出门：提前开门
-          if (a.walkKind === "exit") open = Math.max(open, 0.55);
+          if (a.walkKind === "exit") open = Math.max(open, 0.7);
           return;
         }
         const u = clamp((now - a.walkStart) / WALK_MS, 0, 1);
         if (a.walkKind === "exit") {
-          if (u < 0.12) open = Math.max(open, u / 0.12);
+          // 淡入开门 → 离开时保持开 → 走开后关上
+          if (u < 0.28) open = Math.max(open, clamp(u / 0.12, 0, 1));
           else if (u < 0.55) open = Math.max(open, 1);
-          else open = Math.max(open, clamp(1 - (u - 0.55) / 0.35, 0, 1));
+          else open = Math.max(open, clamp(1 - (u - 0.55) / 0.3, 0, 1));
         } else if (a.walkKind === "enter") {
+          // 走近开门 → 淡出时保持开 → 进门后关上
           if (u < 0.35) open = Math.max(open, clamp(u / 0.2, 0, 1));
-          else if (u < 0.7) open = Math.max(open, 1);
-          else open = Math.max(open, clamp(1 - (u - 0.7) / 0.3, 0, 1));
+          else if (u < 0.85) open = Math.max(open, 1);
+          else open = Math.max(open, clamp(1 - (u - 0.85) / 0.15, 0, 1));
         }
       });
       return clamp(open, 0, 1);
-    }
-
-    /** 介母从声母身后走上广场 */
-    function startFromBehindShengmu(a, L, dest, delayMs) {
-      const sm = actors.find((x) => x.role === "sm" && x.visible);
-      const plazaY = dest.y;
-      const from = sm
-        ? { x: sm.x - 10, y: sm.y - 22 }
-        : { x: L.plaza.cx - 70, y: plazaY - 30 };
-      const via = sm
-        ? { x: sm.x + 18, y: plazaY - 4 }
-        : { x: L.plaza.cx - 20, y: plazaY };
-      a.walkKind = "approach";
-      a.walkStart = performance.now() + (delayMs || 0);
-      a.walkFrom = from;
-      a.walkVia = via;
-      a.walkTo = { x: dest.x, y: dest.y };
-      a.x = from.x;
-      a.y = from.y;
-      a.tx = dest.x;
-      a.ty = dest.y;
-      a.behindTower = false;
-      a.drawBehindSm = true;
-      a.visible = true;
-      a.scale = 1;
-      a.goingHome = false;
-      a.phase = "exit";
-      a.playing = true;
     }
 
     /** 拉手伙伴是否都已到广场（三人模式须等介母到齐） */
@@ -1240,6 +1213,8 @@
           a.behindTower = false;
           a.walkT = 0;
           a.scale = 1;
+          a.alpha = 1;
+          a.drawBehindSm = false;
         }
       });
 
@@ -1265,8 +1240,8 @@
           scale: 1,
         };
         actors.push(jm);
-        // 介母从声母身后走上广场
-        startFromBehindShengmu(jm, L, { x: L.plaza.cx, y: plazaY }, 0);
+        // 介母从介母城堡出门（门开合+淡入），z 轴走在声母后面
+        startDoorExit(jm, L, { x: L.plaza.cx, y: plazaY }, 0);
       }
 
       actors.forEach((a) => { a._wasOut = true; });
@@ -1355,7 +1330,7 @@
         } else if (playMode === "duo") {
           storyTextEl.textContent = `可以一起玩！${day.sm} + ${day.ym} → ${q.syllable}（听喇叭读四声）`;
         } else if (playMode === "trio") {
-          storyTextEl.textContent = `介母「${q.medial}」从声母后面走上来牵手：${day.sm} + ${q.medial} + ${day.ym} → ${q.syllable}（听喇叭读四声）`;
+          storyTextEl.textContent = `介母「${q.medial}」从蓝色城堡出来（走在声母后面）：${day.sm} + ${q.medial} + ${day.ym} → ${q.syllable}（听喇叭读四声）`;
         } else if (playMode === "zhengti") {
           storyTextEl.textContent = `整体认读「${q.syllable}」自己玩——听喇叭读四个声调！`;
         } else {
@@ -2258,7 +2233,12 @@
       ctx.translate(x, y);
       ctx.scale(sc, sc);
       ctx.translate(-x, -y);
-      ctx.globalAlpha = a.phase === "return" && a.behindTower ? Math.max(0.25, sc) : 1;
+      const alpha = a.alpha == null ? 1 : a.alpha;
+      if (alpha <= 0.02) {
+        ctx.restore();
+        return;
+      }
+      ctx.globalAlpha = alpha;
 
       ctx.fillStyle = "rgba(42,58,74,0.15)";
       ctx.beginPath();
@@ -2355,7 +2335,11 @@
         // 大门进出步行（出场 / 回家，速度与声母韵母首次出场一致）
         if (a.walkKind && a.walkStart != null) {
           const done = stepDoorWalk(a);
-          if (done && a.playing && !a.goingHome) a.phase = "play";
+          if (done && a.playing && !a.goingHome) {
+            a.phase = "play";
+            a.drawBehindSm = false;
+            a.alpha = 1;
+          }
           return;
         }
 
@@ -2378,6 +2362,7 @@
         if (a.playing) {
           a.visible = true;
           a.scale = 1;
+          a.alpha = 1;
           a.behindTower = false;
           a.walkT = (a.walkT || 0) + 0.04;
           a.x = lerp(a.x, a.tx, 0.06);
@@ -2386,6 +2371,7 @@
           const arrived = Math.hypot(a.x - a.tx, a.y - a.ty) < 8;
           if (arrived && progress < 0.8) {
             a.phase = "play";
+            a.drawBehindSm = false;
           }
         }
       });
