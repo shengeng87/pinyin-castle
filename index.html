@@ -14,6 +14,8 @@
       --jiemu: #3b82f6;
       --yunmu: #2a9d8f;
       --zhengti: #e9a825;
+      /* 拼音字母（含 ü）统一用此字体，避免 ü 与 a/o/e 字形不一致 */
+      --pinyin-font: "Noto Sans SC", "Microsoft YaHei", "PingFang SC", sans-serif;
       font-family: "Noto Sans SC", "Microsoft YaHei", sans-serif;
     }
 
@@ -202,6 +204,8 @@
       border-radius: 16px;
       color: #fff;
       text-align: center;
+      font-family: var(--pinyin-font);
+      font-weight: 700;
     }
 
     .cloud .chip.sm { background: var(--shengmu); }
@@ -256,9 +260,9 @@
     }
 
     .answers.medial-pick button {
-      font-family: "ZCOOL KuaiLe", cursive;
+      font-family: var(--pinyin-font);
       font-size: clamp(22px, 6vw, 30px);
-      font-weight: 400;
+      font-weight: 700;
       background: #e8f7f4;
     }
 
@@ -2497,7 +2501,7 @@
             ctx.fillStyle = active ? "#c47a12" : "rgba(42,58,74,0.45)";
             ctx.font = `700 ${Math.max(10, W * 0.014)}px "Noto Sans SC", sans-serif`;
             ctx.fillText(TONE_NAMES[i], x, barY + 14);
-            ctx.font = `700 ${Math.max(13, W * 0.02)}px "ZCOOL KuaiLe", sans-serif`;
+            ctx.font = `700 ${Math.max(13, W * 0.02)}px "Noto Sans SC", "Microsoft YaHei", sans-serif`;
             ctx.fillStyle = active ? "#e86a3c" : "#2a3a4a";
             ctx.fillText(slot.form, x, barY + 34);
             ctx.font = `700 ${Math.max(12, W * 0.017)}px "Noto Sans SC", sans-serif`;
@@ -2557,7 +2561,7 @@
       ctx.fillStyle = a.color;
       const chars = Math.max(1, String(a.text || "").length);
       const fontSize = Math.max(14, Math.min(22, (bellyW - 10) / Math.max(1, chars * 0.72)));
-      ctx.font = `700 ${fontSize}px "ZCOOL KuaiLe", sans-serif`;
+      ctx.font = `700 ${fontSize}px "Noto Sans SC", "Microsoft YaHei", sans-serif`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(a.text, x, y + 1);
