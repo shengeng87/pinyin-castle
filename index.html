@@ -1646,12 +1646,42 @@
         }
       }
 
-      // 雉堞（垛口）
+      // 尖顶屋顶：底边紧贴塔身顶，先画（在城垛后面）
+      const roofBase = y;
+      ctx.fillStyle = "#8b3a1a";
+      ctx.beginPath();
+      ctx.moveTo(cx - w * 0.5, roofBase);
+      ctx.lineTo(cx, roofBase - roofH);
+      ctx.lineTo(cx + w * 0.5, roofBase);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = "#c45a2a";
+      ctx.beginPath();
+      ctx.moveTo(cx - w * 0.38, roofBase);
+      ctx.lineTo(cx, roofBase - roofH * 0.72);
+      ctx.lineTo(cx + w * 0.38, roofBase);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = "#e8c070";
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(cx, roofBase - roofH);
+      ctx.lineTo(cx, roofBase);
+      ctx.stroke();
+      ctx.fillStyle = "#f0d080";
+      ctx.beginPath();
+      ctx.arc(cx, roofBase - roofH - 3, 4.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 雉堞画在三角形前面，盖住屋顶底边，并与塔身颜色衔接
       const merlon = Math.max(9, w / 6.5);
       const merlonCount = Math.floor(w / (merlon * 1.15));
+      ctx.fillStyle = color;
+      roundRect(x - 2, y - 4, w + 4, 8, 2);
+      ctx.fill();
       for (let i = 0; i < merlonCount; i++) {
         const mx = x + 4 + i * merlon * 1.15;
-        const mg = ctx.createLinearGradient(mx, y - 16, mx, y);
+        const mg = ctx.createLinearGradient(mx, y - 16, mx, y + 2);
         mg.addColorStop(0, soft);
         mg.addColorStop(1, color);
         ctx.fillStyle = mg;
@@ -1662,36 +1692,6 @@
         roundRect(mx, y - 16, merlon * 0.72, 20, 3);
         ctx.stroke();
       }
-
-      // 尖顶屋顶（双层）
-      const roofBase = y - 6;
-      ctx.fillStyle = "#8b3a1a";
-      ctx.beginPath();
-      ctx.moveTo(cx - w * 0.48, roofBase);
-      ctx.lineTo(cx, roofBase - roofH);
-      ctx.lineTo(cx + w * 0.48, roofBase);
-      ctx.closePath();
-      ctx.fill();
-      ctx.fillStyle = "#c45a2a";
-      ctx.beginPath();
-      ctx.moveTo(cx - w * 0.36, roofBase - 2);
-      ctx.lineTo(cx, roofBase - roofH * 0.72);
-      ctx.lineTo(cx + w * 0.36, roofBase - 2);
-      ctx.closePath();
-      ctx.fill();
-      // 屋脊金线
-      ctx.strokeStyle = "#e8c070";
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      ctx.moveTo(cx, roofBase - roofH);
-      ctx.lineTo(cx, roofBase - 4);
-      ctx.stroke();
-      // 宝顶（旗帜插在宝顶处）
-      ctx.fillStyle = "#f0d080";
-      ctx.beginPath();
-      ctx.arc(cx, roofBase - roofH - 3, 4.5, 0, Math.PI * 2);
-      ctx.fill();
-
       // 拱门
       const doorW = w * 0.34;
       const doorH = h * 0.3;
