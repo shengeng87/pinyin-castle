@@ -325,7 +325,7 @@
           <div class="answers" id="answersCan">
             <button type="button" data-answer="ok">可以</button>
             <button type="button" data-answer="no">不可以</button>
-            <button type="button" data-answer="medial">需要介母</button>
+            <button type="button" data-answer="medial">加入介母</button>
             <button type="button" data-answer="zhengti">整体认读</button>
           </div>
         </div>
@@ -440,7 +440,7 @@
       zhengti: { id: "zhengti", name: "整体认读家族", color: "#e9a825", soft: "#ffe08a", label: "整体认读" },
     };
 
-    const ANSWER_LABEL = { ok: "可以", medial: "需要介母", no: "不可以", zhengti: "整体认读" };
+    const ANSWER_LABEL = { ok: "可以", medial: "加入介母", no: "不可以", zhengti: "整体认读" };
 
     const canvas = document.getElementById("scene");
     const ctx = canvas.getContext("2d");
@@ -1164,7 +1164,7 @@
       return list;
     }
 
-    /** 判题：整体认读优先，其次两拼 / 需要介母 / 不可以 */
+    /** 判题：整体认读优先，其次两拼 / 加入介母 / 不可以 */
     function classify(sm, ym) {
       const zt = ZHENGTI_KEY.get(`${sm}+${ym}`);
       if (zt) return { answer: "zhengti", medial: null, medials: [], syllable: zt };
@@ -1586,7 +1586,7 @@
       } else if (progress < 0.22) {
         storyTextEl.textContent = `「${day.sm}」和「${day.ym}」从声母塔、韵母塔里走出来了。`;
       } else if (!quizSolved) {
-        storyTextEl.textContent = "先判断：可以拼？需要介母？整体认读？还是不可以？";
+        storyTextEl.textContent = "先判断：可以拼？加入介母？整体认读？还是不可以？";
       } else if (progress < 0.78) {
         const q = day.quiz;
         if (hornSpeaking && hornToneIndex >= 0) {
@@ -1677,9 +1677,9 @@
       if (q.answer === "medial") {
         const meds = q.medials && q.medials.length ? q.medials : (q.medial ? [q.medial] : []);
         if (meds.length > 1) {
-          return `答案是「需要介母」：可以请 ${meds.join(" 或 ")} 来帮忙。`;
+          return `答案是「加入介母」：可以请 ${meds.join(" 或 ")} 来帮忙。`;
         }
-        return `答案是「需要介母」：中间要请介母「${meds[0] || q.medial}」来帮忙。`;
+        return `答案是「加入介母」：中间要请介母「${meds[0] || q.medial}」来帮忙。`;
       }
       if (q.answer === "zhengti") {
         return `答案是「整体认读」：组成「${q.syllable}」，不用拼，要整个认！`;
@@ -1709,7 +1709,7 @@
             resumeDay();
           }, 700);
         } else if (choice === "medial") {
-          quizFeedbackEl.textContent = "对！还需要介母帮忙～";
+          quizFeedbackEl.textContent = "对！加入介母帮忙～";
           setTimeout(() => openMedialQuiz(), 700);
         } else if (choice === "zhengti") {
           quizFeedbackEl.textContent = `对！是整体认读「${q.syllable}」！`;
