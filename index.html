@@ -1453,7 +1453,9 @@
         zhengti: { cx: W * 0.91, baseY: frontY, w: tw, h: th },
       };
       const gateBaseY = (frontY + backY) / 2;
-      const gateTop = gateBaseY - 98; // 城门雉堞顶，喇叭杆底插在这里
+      const gateTop = gateBaseY - 98; // 城门雉堞顶
+      // 杆底继续下插到门楼主体中部，绘制时被城门/城垛盖住
+      const hornPlantY = gateBaseY - 48;
       return {
         towers,
         plaza: {
@@ -1463,8 +1465,8 @@
           rh: Math.min(105, H * 0.12),
         },
         gate: { cx, baseY: gateBaseY },
-        // cy=喇叭本体；baseY=杆子底部插在城门上
-        horn: { cx: cx + 4, cy: gateTop - 78, baseY: gateTop },
+        // cy=喇叭本体；baseY=杆子底部（在城门后方）
+        horn: { cx: cx + 4, cy: gateTop - 78, baseY: hornPlantY },
         ground,
       };
     }
@@ -1959,10 +1961,39 @@
       ctx.stroke();
     }
 
-    function drawHorn(cx, cy, baseY) {
+    // 杆子+底座：在城门之前绘制，被门楼与城垛遮挡
+    function drawHornPole(cx, cy, baseY) {
+      const plantY = baseY != null ? baseY : cy + 36;
+      ctx.save();
+      ctx.strokeStyle = "#6b4a2e";
+      ctx.lineWidth = 5;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(cx, plantY);
+      ctx.lineTo(cx, cy + 10);
+      ctx.stroke();
+      ctx.strokeStyle = "#8b5a2b";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(cx, plantY);
+      ctx.lineTo(cx, cy + 10);
+      ctx.stroke();
+      // 杆底固定环（落在门楼后方）
+      ctx.fillStyle = "#c4a882";
+      ctx.beginPath();
+      ctx.ellipse(cx, plantY + 2, 10, 5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#6b4a2e";
+      ctx.beginPath();
+      ctx.ellipse(cx, plantY, 7, 3.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // 喇叭本体+声调条：在城门之后绘制，露在雉堞上方
+    function drawHorn(cx, cy) {
       const pulse = hornSpeaking ? 0.55 + 0.45 * Math.abs(Math.sin(performance.now() / 140)) : hornPulse;
       const scale = 1 + pulse * 0.1;
-      const plantY = baseY != null ? baseY : cy + 36;
 
       // 四声汉字条：画在喇叭正上方
       if ((hornSpeaking || hornToneSlots.length) && (playMode === "duo" || playMode === "trio" || playMode === "zhengti")) {
@@ -2007,31 +2038,7 @@
         }
       }
 
-      // 长杆：底部插在城门顶，向上撑起喇叭
       ctx.save();
-      ctx.strokeStyle = "#6b4a2e";
-      ctx.lineWidth = 5;
-      ctx.lineCap = "round";
-      ctx.beginPath();
-      ctx.moveTo(cx, plantY);
-      ctx.lineTo(cx, cy + 10);
-      ctx.stroke();
-      ctx.strokeStyle = "#8b5a2b";
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(cx, plantY);
-      ctx.lineTo(cx, cy + 10);
-      ctx.stroke();
-      // 杆底固定环
-      ctx.fillStyle = "#c4a882";
-      ctx.beginPath();
-      ctx.ellipse(cx, plantY + 2, 10, 5, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = "#6b4a2e";
-      ctx.beginPath();
-      ctx.ellipse(cx, plantY, 7, 3.5, 0, 0, Math.PI * 2);
-      ctx.fill();
-
       ctx.translate(cx, cy);
       ctx.scale(scale, scale);
       // 喇叭本体
@@ -2271,8 +2278,9 @@
       const waveZt = t * 2.4 + 3.3;
       const lit = night > 0.35;
 
-      // 连廊 → 回家精灵（走进门后被塔身盖住）→ 塔楼 → 广场 → 玩耍精灵+手拉手 → 喇叭
+      // 连廊 → 喇叭杆（被城门盖住）→ 城门 → 回家精灵 → 塔楼 → 广场 → 玩耍精灵 → 喇叭本体
       drawWalls(L, T);
+      drawHornPole(L.horn.cx, L.horn.cy, L.horn.baseY);
       drawGate(L);
       actors.filter((a) => a.behindTower || a.phase === "return" || a.goingHome).forEach((a) => drawActor(a, t));
       drawTower(T.jiemu.cx, T.jiemu.baseY, T.jiemu.w, T.jiemu.h, FAMILY.jiemu.color, FAMILY.jiemu.soft, "介母", waveJm, 48, lit);
@@ -2284,7 +2292,7 @@
       const activeActors = actors.filter((a) => !a.behindTower && a.phase !== "return" && !a.goingHome);
       activeActors.forEach((a) => drawActor(a, t));
       drawHandLinks(t);
-      drawHorn(L.horn.cx, L.horn.cy, L.horn.baseY);
+      drawHorn(L.horn.cx, L.horn.cy);
 
       if (night > 0) {
         ctx.fillStyle = `rgba(10,18,36,${0.45 * night})`;
