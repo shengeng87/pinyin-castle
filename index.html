@@ -1825,9 +1825,17 @@
     function drawGate(L) {
       const gx = L.gate.cx;
       const gy = L.gate.baseY != null ? L.gate.baseY : L.ground;
-      // 门楼底座
       const gw = 96;
       const gh = 86;
+
+      // 雉堞在主体后面、喇叭杆前面（杆已先画）
+      for (let i = 0; i < 5; i++) {
+        ctx.fillStyle = i % 2 ? "#b89570" : "#a88860";
+        roundRect(gx - gw / 2 + 6 + i * 17, gy - gh - 12, 12, 14, 2);
+        ctx.fill();
+      }
+
+      // 门楼主体盖住雉堞下半
       const gcol = ctx.createLinearGradient(gx - gw / 2, gy - gh, gx + gw / 2, gy - gh);
       gcol.addColorStop(0, "#c4a882");
       gcol.addColorStop(0.5, "#a88860");
@@ -1839,13 +1847,6 @@
       ctx.lineWidth = 2;
       roundRect(gx - gw / 2, gy - gh, gw, gh, 8);
       ctx.stroke();
-
-      // 门楼雉堞
-      for (let i = 0; i < 5; i++) {
-        ctx.fillStyle = i % 2 ? "#b89570" : "#a88860";
-        roundRect(gx - gw / 2 + 6 + i * 17, gy - gh - 12, 12, 14, 2);
-        ctx.fill();
-      }
 
       // 拱门洞
       ctx.fillStyle = "#3a2818";
