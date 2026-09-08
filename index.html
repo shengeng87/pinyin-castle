@@ -407,16 +407,17 @@
       w: ["a","ai","an","ang","ei","en","eng","o"],
     };
 
-    // 三拼：声母 + 介母(i/u/ü) + 韵母
+    // 三拼：声母 + 介母(i/u/ü) + 韵母（仅普通话常用音节）
     // üe 是独立复韵母（两拼 j/q/x+üe），不要拆成介母 ü + e
     // üan 可两拼；j/q/x + an 也可请介母 ü → juan/quan/xuan
+    // 注意：无 bia/pia/mia、无 biang 等
     const THREE = {
-      b: { i: ["a","ao","an","ang"] },
-      p: { i: ["a","ao","an","ang"] },
-      m: { i: ["a","ao","an","ang"] },
-      d: { i: ["a","ao","an","ang"], u: ["o","an","ai"] },
-      t: { i: ["a","ao","an","ang"], u: ["o","an","ai"] },
-      n: { i: ["a","ao","an","ang"], u: ["o","an"] },
+      b: { i: ["ao","an"] },
+      p: { i: ["ao","an"] },
+      m: { i: ["ao","an"] },
+      d: { i: ["a","ao","an"], u: ["o","an"] },
+      t: { i: ["ao","an"], u: ["o","an"] },
+      n: { i: ["ao","an","ang"], u: ["o","an"] },
       l: { i: ["a","ao","an","ang"], u: ["o","an"] },
       g: { u: ["a","o","ai","an","ang"] },
       k: { u: ["a","o","ai","an","ang"] },
