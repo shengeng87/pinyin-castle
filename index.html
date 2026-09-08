@@ -359,7 +359,7 @@
     ];
     const YUNMU = [
       "a","o","e","i","u","ü","ai","ei","ui","ao","ou","iu","ie","üe","er",
-      "an","en","in","un","ün","ang","eng","ing","ong",
+      "an","en","in","un","ün","ang","eng","ing","ong","üan",
     ];
     const ZHENGTI = [
       "zhi","chi","shi","ri","zi","ci","si","yi","wu","yu",
@@ -378,6 +378,7 @@
     const ZHENGTI_KEY = new Map(ZHENGTI_PAIRS.map(([sm, ym, syl]) => [`${sm}+${ym}`, syl]));
 
     // 两拼：声母 + 韵母 能直接组成音节
+    // 注意：üe / üan 是独立复韵母，不是「介母ü + e/an」
     const TWO = {
       b: ["a","ai","ao","an","ang","ei","en","eng","i","ie","in","ing","o","u"],
       p: ["a","ai","ao","an","ang","ei","en","eng","i","ie","in","ing","o","ou","u"],
@@ -386,13 +387,13 @@
       d: ["a","ai","ao","an","ang","e","ei","en","eng","i","ie","ing","iu","ong","ou","u","ui","un"],
       t: ["a","ai","ao","an","ang","e","ei","en","eng","i","ie","ing","ong","ou","u","ui","un"],
       n: ["a","ai","ao","an","ang","e","ei","en","eng","i","ie","in","ing","iu","ong","ou","u","ü","üe","ün"],
-      l: ["a","ai","ao","an","ang","e","ei","eng","i","ie","in","ing","iu","ong","ou","u","ü","üe","ün","un"],
+      l: ["a","ai","ao","an","ang","e","ei","eng","i","ie","in","ing","iu","ong","ou","u","ü","üe","ün","un","üan"],
       g: ["a","ai","ao","an","ang","e","ei","en","eng","ong","ou","u","ui","un"],
       k: ["a","ai","ao","an","ang","e","ei","en","eng","ong","ou","u","ui","un"],
       h: ["a","ai","ao","an","ang","e","ei","en","eng","ong","ou","u","ui","un"],
-      j: ["i","ia","ie","in","ing","iu","ü","üe","ün"],
-      q: ["i","ia","ie","in","ing","iu","ü","üe","ün"],
-      x: ["i","ia","ie","in","ing","iu","ü","üe","ün"],
+      j: ["i","ia","ie","in","ing","iu","ü","üe","ün","üan"],
+      q: ["i","ia","ie","in","ing","iu","ü","üe","ün","üan"],
+      x: ["i","ia","ie","in","ing","iu","ü","üe","ün","üan"],
       zh: ["a","ai","ao","an","ang","e","ei","en","eng","i","ong","ou","u","ui","un"],
       ch: ["a","ai","ao","an","ang","e","en","eng","i","ong","ou","u","ui","un"],
       sh: ["a","ai","ao","an","ang","e","ei","en","eng","i","ou","u","ui","un"],
@@ -400,26 +401,26 @@
       z: ["a","ai","ao","an","ang","e","ei","en","eng","i","ong","ou","u","ui","un"],
       c: ["a","ai","ao","an","ang","e","en","eng","i","ong","ou","u","ui","un"],
       s: ["a","ai","ao","an","ang","e","en","eng","i","ong","ou","u","ui","un"],
-      y: ["a","ao","an","ang","e","i","in","ing","ong","ou","u","ü","üe","ün"],
+      y: ["a","ao","an","ang","e","i","in","ing","ong","ou","u","ü","üe","ün","üan"],
       w: ["a","ai","an","ang","ei","en","eng","o","u"],
     };
 
-    // 三拼：声母 + 介母 + 韵母（韵母取基本韵母表中的后段）
-    // 格式：sm -> { 介母: [韵母, ...] }
+    // 三拼：声母 + 介母(i/u/ü) + 韵母
+    // 勿把已是独立复韵母的 üe / üan 拆成 ü+e / ü+an
     const THREE = {
       b: { i: ["a","ao","an","ang"] },
       p: { i: ["a","ao","an","ang"] },
       m: { i: ["a","ao","an","ang"] },
       d: { i: ["a","ao","an","ang"], u: ["o","an","ai"] },
       t: { i: ["a","ao","an","ang"], u: ["o","an","ai"] },
-      n: { i: ["a","ao","an","ang"], u: ["o","an"], ü: ["e"] },
-      l: { i: ["a","ao","an","ang"], u: ["o","an"], ü: ["e"] },
+      n: { i: ["a","ao","an","ang"], u: ["o","an"] },
+      l: { i: ["a","ao","an","ang"], u: ["o","an"] },
       g: { u: ["a","o","ai","an","ang"] },
       k: { u: ["a","o","ai","an","ang"] },
       h: { u: ["a","o","ai","an","ang"] },
-      j: { i: ["a","ao","an","ang","ong"], ü: ["e","an"] },
-      q: { i: ["a","ao","an","ang","ong"], ü: ["e","an"] },
-      x: { i: ["a","ao","an","ang","ong"], ü: ["e","an"] },
+      j: { i: ["a","ao","an","ang","ong"] },
+      q: { i: ["a","ao","an","ang","ong"] },
+      x: { i: ["a","ao","an","ang","ong"] },
       zh: { u: ["a","o","ai","an","ang"] },
       ch: { u: ["a","o","ai","an","ang"] },
       sh: { u: ["a","o","ai","an","ang"] },
