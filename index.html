@@ -966,8 +966,20 @@
     }
 
     function towerHome(family, L) {
+      // 门口外侧：出门起点
       const t = L.towers[family] || L.towers.zhengti;
-      return { x: t.cx, y: t.baseY - 20 };
+      return { x: t.cx, y: t.baseY - 12 };
+    }
+
+    function towerInside(family, L) {
+      // 进门后藏进塔身，看起来回到城堡里
+      const t = L.towers[family] || L.towers.zhengti;
+      return { x: t.cx, y: t.baseY - Math.min(58, t.h * 0.34) };
+    }
+
+    function actorBellyW(text) {
+      const chars = Math.max(1, String(text || "").length);
+      return Math.max(52, 28 + chars * 16);
     }
 
     function spawnActors(day, L) {
@@ -1014,23 +1026,29 @@
       playMode = mode;
       const L = layout();
       const plazaY = L.plaza.cy - 8;
+      // 手拉手：站得更近
+      const gap = mode === "trio" ? 56 : 48;
 
       actors.forEach((a) => {
         if (a.role === "sm") {
-          a.tx = mode === "trio" ? L.plaza.cx - 88 : L.plaza.cx - 70;
+          a.tx = L.plaza.cx - gap;
           a.ty = plazaY;
           a.visible = true;
           a.playing = true;
           a.phase = "exit";
+          a.goingHome = false;
           a.walkT = 0;
+          a.scale = 1;
         }
         if (a.role === "ym") {
-          a.tx = mode === "trio" ? L.plaza.cx + 88 : L.plaza.cx + 70;
+          a.tx = L.plaza.cx + gap;
           a.ty = plazaY;
           a.visible = true;
           a.playing = true;
           a.phase = "exit";
+          a.goingHome = false;
           a.walkT = 0;
+          a.scale = 1;
         }
       });
 
@@ -1046,18 +1064,16 @@
           family: "jiemu",
           color: FAMILY.jiemu.color,
           x: jmHome.x,
-          y: jmHome.y - 10,
+          y: jmHome.y,
           tx: L.plaza.cx,
           ty: plazaY,
           visible: true,
           phase: "exit",
           playing: true,
+          goingHome: false,
           appearAt: 0,
           walkT: 0,
-        });
-        actors.forEach((a) => {
-          if (a.role === "sm") a.tx = L.plaza.cx - 88;
-          if (a.role === "ym") a.tx = L.plaza.cx + 88;
+          scale: 1,
         });
       }
 
@@ -1078,7 +1094,7 @@
           a.playing = false;
           a.phase = "return";
           a.goingHome = true;
-          const home = towerHome(a.family, L);
+          const home = towerInside(a.family, L);
           a.tx = home.x;
           a.ty = home.y;
           a.walkT = 0;
@@ -1102,8 +1118,10 @@
           visible: true,
           phase: "exit",
           playing: true,
+          goingHome: false,
           walkT: 0,
           _wasOut: true,
+          scale: 1,
         });
         scheduleHornTones(200);
       }, 900);
@@ -1117,7 +1135,7 @@
         a.playing = false;
         a.phase = "return";
         a.goingHome = true;
-        const home = towerHome(a.family, L);
+        const home = towerInside(a.family, L);
         a.tx = home.x;
         a.ty = home.y;
       });
@@ -1982,15 +2000,25 @@
 
     function drawActor(a, t) {
       if (!a.visible) return;
-      const bob = Math.sin(t * 6 + a.x * 0.01) * (a.phase === "play" ? 5 : 2);
+      const syncPlay = a.phase === "play" && (playMode === "duo" || playMode === "trio");
+      const bob = syncPlay
+        ? Math.sin(t * 4.2) * 5
+        : Math.sin(t * 6 + a.x * 0.01) * (a.phase === "play" ? 5 : 2);
       const x = a.x;
       const y = a.y + bob;
-      const chars = Math.max(1, String(a.text || "").length);
-      // 肚子随字母变宽，保证 zh / üan 等也能完整显示
-      const bellyW = Math.max(52, 28 + chars * 16);
+      a._drawX = x;
+      a._drawY = y;
+      const bellyW = actorBellyW(a.text);
       const bellyH = 34;
       const bodyRx = bellyW * 0.58;
       const bodyRy = 28;
+      const sc = a.scale == null ? 1 : a.scale;
+
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.scale(sc, sc);
+      ctx.translate(-x, -y);
+      ctx.globalAlpha = a.phase === "return" ? Math.max(0.25, sc) : 1;
 
       ctx.fillStyle = "rgba(42,58,74,0.15)";
       ctx.beginPath();
@@ -2005,6 +2033,7 @@
       roundRect(x - bellyW / 2, y - bellyH / 2, bellyW, bellyH, 14);
       ctx.fill();
       ctx.fillStyle = a.color;
+      const chars = Math.max(1, String(a.text || "").length);
       const fontSize = Math.max(14, Math.min(22, (bellyW - 10) / Math.max(1, chars * 0.72)));
       ctx.font = `700 ${fontSize}px "ZCOOL KuaiLe", sans-serif`;
       ctx.textAlign = "center";
@@ -2016,6 +2045,56 @@
       ctx.arc(x - 12, y - 24, 2.4, 0, Math.PI * 2);
       ctx.arc(x + 12, y - 24, 2.4, 0, Math.PI * 2);
       ctx.fill();
+
+      // 小手（方便手拉手）
+      if (a.phase === "play" && (playMode === "duo" || playMode === "trio")) {
+        ctx.fillStyle = a.color;
+        ctx.beginPath();
+        ctx.arc(x - bodyRx * 0.92, y + 2, 6, 0, Math.PI * 2);
+        ctx.arc(x + bodyRx * 0.92, y + 2, 6, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    function drawHandLinks(t) {
+      if (playMode !== "duo" && playMode !== "trio") return;
+      const order = playMode === "trio" ? ["sm", "jm", "ym"] : ["sm", "ym"];
+      const list = order
+        .map((r) => actors.find((a) => a.role === r && a.visible && a.phase === "play"))
+        .filter(Boolean);
+      if (list.length < 2) return;
+
+      for (let i = 0; i < list.length - 1; i++) {
+        const a = list[i];
+        const b = list[i + 1];
+        const aw = actorBellyW(a.text) * 0.58;
+        const bw = actorBellyW(b.text) * 0.58;
+        const x1 = (a._drawX != null ? a._drawX : a.x) + aw * 0.92;
+        const y1 = (a._drawY != null ? a._drawY : a.y) + 2;
+        const x2 = (b._drawX != null ? b._drawX : b.x) - bw * 0.92;
+        const y2 = (b._drawY != null ? b._drawY : b.y) + 2;
+        const mx = (x1 + x2) / 2;
+        const my = (y1 + y2) / 2 + Math.sin(t * 4.2 + i) * 3;
+
+        ctx.strokeStyle = "rgba(42,58,74,0.22)";
+        ctx.lineWidth = 7;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.quadraticCurveTo(mx, my + 6, x2, y2);
+        ctx.stroke();
+
+        const grad = ctx.createLinearGradient(x1, y1, x2, y2);
+        grad.addColorStop(0, a.color);
+        grad.addColorStop(1, b.color);
+        ctx.strokeStyle = grad;
+        ctx.lineWidth = 4.5;
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.quadraticCurveTo(mx, my + 6, x2, y2);
+        ctx.stroke();
+      }
     }
 
     function updateActors(progress, t) {
@@ -2028,6 +2107,7 @@
           const waitX = a.role === "sm" ? L.plaza.cx - 72 : L.plaza.cx + 72;
           const waitY = L.plaza.cy - 8;
           a.visible = true;
+          a.scale = 1;
           if (progress < 0.08 + delay) {
             a.x = home.x;
             a.y = home.y;
@@ -2040,38 +2120,47 @@
           return;
         }
 
-        // 不能玩 / 整体认读换人：先回家
-        if (playMode === "none" || (playMode === "zhengti" && (a.role === "sm" || a.role === "ym"))) {
-          const home = towerHome(a.family, L);
-          a.x = lerp(a.x, home.x, 0.1);
-          a.y = lerp(a.y, home.y, 0.1);
-          if (Math.hypot(a.x - home.x, a.y - home.y) < 14) a.visible = false;
+        // 回家：走进城堡门洞里再消失
+        const shouldReturn =
+          a.goingHome ||
+          progress >= 0.8 ||
+          playMode === "none" ||
+          (playMode === "zhengti" && (a.role === "sm" || a.role === "ym"));
+
+        if (shouldReturn && !(a.playing && progress < 0.8 && !a.goingHome)) {
+          a.playing = false;
+          a.phase = "return";
+          a.goingHome = true;
+          const inside = towerInside(a.family, L);
+          const speed = progress >= 0.9 ? 0.2 : 0.14;
+          a.x = lerp(a.x, inside.x, speed);
+          a.y = lerp(a.y, inside.y, speed);
+          const dist = Math.hypot(a.x - inside.x, a.y - inside.y);
+          a.scale = clamp(dist / 50, 0.25, 1);
+          a.visible = dist > 8;
           return;
         }
 
-        // 玩耍中（两拼 / 三拼 / 整体认读自己玩）
+        // 玩耍中（两拼 / 三拼手拉手；整体认读自己玩）
         if (a.playing) {
           a.visible = true;
+          a.scale = 1;
           a.walkT = (a.walkT || 0) + 0.04;
-          a.x = lerp(a.x, a.tx, 0.1);
-          a.y = lerp(a.y, a.ty, 0.1);
+          a.x = lerp(a.x, a.tx, 0.12);
+          a.y = lerp(a.y, a.ty, 0.12);
 
           const arrived = Math.hypot(a.x - a.tx, a.y - a.ty) < 8;
           if (arrived && progress < 0.8) {
             a.phase = "play";
-            if (playMode === "duo" || playMode === "trio" || playMode === "zhengti") {
-              const phase = a.role === "sm" ? 0 : a.role === "ym" ? 1 : a.role === "jm" ? 2 : 3;
-              a.y = a.ty + Math.sin(t * 5 + phase) * 4;
+            if (playMode === "duo" || playMode === "trio") {
+              // 同步蹦跳 + 轻微左右摇，像手拉手一起玩
+              const sway = Math.sin(t * 2.1) * 5;
+              a.x = a.tx + sway;
+              a.y = a.ty + Math.sin(t * 4.2) * 5;
+            } else if (playMode === "zhengti") {
+              a.y = a.ty + Math.sin(t * 5) * 4;
             }
           }
-        }
-
-        if (progress >= 0.8) {
-          a.phase = "return";
-          const home = towerHome(a.family, L);
-          a.x = lerp(a.x, home.x, 0.08);
-          a.y = lerp(a.y, home.y, 0.08);
-          if (Math.hypot(a.x - home.x, a.y - home.y) < 12) a.visible = false;
         }
       });
     }
@@ -2129,17 +2218,19 @@
       const waveZt = t * 2.4 + 3.3;
       const lit = night > 0.35;
 
-      // 连廊先画（在城堡后面），再门楼，再塔楼盖住连廊端点
+      // 连廊 → 回家精灵（走进门后被塔身盖住）→ 塔楼 → 广场 → 玩耍精灵+手拉手 → 喇叭
       drawWalls(L, T);
       drawGate(L);
+      actors.filter((a) => a.phase === "return" || a.goingHome).forEach((a) => drawActor(a, t));
       drawTower(T.jiemu.cx, T.jiemu.baseY, T.jiemu.w, T.jiemu.h, FAMILY.jiemu.color, FAMILY.jiemu.soft, "介母", waveJm, 48, lit);
       drawTower(T.yunmu.cx, T.yunmu.baseY, T.yunmu.w, T.yunmu.h, FAMILY.yunmu.color, FAMILY.yunmu.soft, "韵母", waveYm, 48, lit);
       drawPlaza(L.plaza.cx, L.plaza.cy, L.plaza.rw, L.plaza.rh);
       drawTower(T.shengmu.cx, T.shengmu.baseY, T.shengmu.w, T.shengmu.h, FAMILY.shengmu.color, FAMILY.shengmu.soft, "声母", waveSm, 48, lit);
       drawTower(T.zhengti.cx, T.zhengti.baseY, T.zhengti.w, T.zhengti.h, FAMILY.zhengti.color, FAMILY.zhengti.soft, "整体认读", waveZt, 48, lit);
 
-      actors.forEach((a) => drawActor(a, t));
-      // 喇叭与声调条最后画，保证不被小精灵挡住
+      const activeActors = actors.filter((a) => a.phase !== "return" && !a.goingHome);
+      activeActors.forEach((a) => drawActor(a, t));
+      drawHandLinks(t);
       drawHorn(L.horn.cx, L.horn.cy, L.horn.baseY);
 
       if (night > 0) {
