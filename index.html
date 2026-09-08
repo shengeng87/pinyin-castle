@@ -1491,17 +1491,16 @@
       ctx.restore();
     }
 
-    function drawBanner(x, y, text, color, sway) {
-      // (x,y) = 旗杆底部，插在城堡屋顶尖上；旗杆向上升起
+    function drawBanner(x, y, text, color, wave) {
+      // (x,y) = 旗杆底部；旗杆固定不晃，只有旗布飘扬
       ctx.save();
       ctx.translate(x, y);
-      ctx.rotate(sway);
       // 底座小球
       ctx.fillStyle = "#e8c070";
       ctx.beginPath();
       ctx.arc(0, 2, 4, 0, Math.PI * 2);
       ctx.fill();
-      // 旗杆向上
+      // 旗杆向上（固定）
       ctx.strokeStyle = "#6b4a2e";
       ctx.lineWidth = 3.5;
       ctx.lineCap = "round";
@@ -1514,17 +1513,20 @@
       ctx.beginPath();
       ctx.arc(0, -64, 3.5, 0, Math.PI * 2);
       ctx.fill();
-      // 旗布挂在杆上部
-      const fg = ctx.createLinearGradient(2, -60, 56, -20);
+      // 旗布飘扬（波浪变形）
+      const w1 = Math.sin(wave) * 7;
+      const w2 = Math.sin(wave * 1.3 + 0.8) * 9;
+      const w3 = Math.sin(wave * 0.9 + 1.6) * 6;
+      const fg = ctx.createLinearGradient(2, -60, 56 + w2, -20);
       fg.addColorStop(0, softHex(color, 0.25));
       fg.addColorStop(0.5, color);
       fg.addColorStop(1, softHex(color, -0.12));
       ctx.fillStyle = fg;
       ctx.beginPath();
       ctx.moveTo(2, -58);
-      ctx.quadraticCurveTo(28, -62, 56, -50);
-      ctx.lineTo(52, -24);
-      ctx.quadraticCurveTo(28, -32, 2, -28);
+      ctx.quadraticCurveTo(26 + w1 * 0.4, -64 + w1 * 0.15, 56 + w2, -52 + w3 * 0.4);
+      ctx.lineTo(50 + w3, -22 + w2 * 0.2);
+      ctx.quadraticCurveTo(26 + w1 * 0.3, -30 + w1 * 0.1, 2, -28);
       ctx.closePath();
       ctx.fill();
       ctx.strokeStyle = "rgba(255,255,255,0.35)";
@@ -1534,7 +1536,7 @@
       ctx.font = `700 ${Math.max(11, W * 0.018)}px "Noto Sans SC", sans-serif`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(text, 28, -42);
+      ctx.fillText(text, 26 + w1 * 0.25, -42 + w2 * 0.08);
       ctx.restore();
     }
 
@@ -1544,7 +1546,7 @@
       return `rgb(${adj(r)},${adj(g)},${adj(b)})`;
     }
 
-    function drawTower(cx, baseY, w, h, color, soft, label, sway, roofH, lit) {
+    function drawTower(cx, baseY, w, h, color, soft, label, wave, roofH, lit) {
       const x = cx - w / 2;
       const y = baseY - h;
 
@@ -1735,7 +1737,7 @@
       ctx.textBaseline = "middle";
       ctx.fillText(label, cx, y + h * 0.56 + 16);
       // 家族旗帜插在屋顶尖
-      drawBanner(cx, roofBase - roofH - 2, label.slice(0, 2), color, sway);
+      drawBanner(cx, roofBase - roofH - 2, label.slice(0, 2), color, wave);
     }
 
     function drawGate(L) {
@@ -2032,44 +2034,6 @@
       ctx.fill();
     }
 
-    function drawResultBubble(L, t) {
-      // 答对后只要在玩耍阶段就显示（答题时常暂停在 0.3 左右，不能再用 >=0.4）
-      if (!today || !quizSolved) return;
-      if (playMode !== "duo" && playMode !== "trio" && playMode !== "zhengti") return;
-      if (dayProgress > 0.84) return;
-      const q = today.quiz;
-      if (!q || !q.syllable) return;
-      // 广场正上方，在塔楼与小精灵之间
-      const cx = L.plaza.cx;
-      const cy = L.plaza.cy - Math.min(110, H * 0.16);
-      const bob = Math.sin(t * 2.2) * 3;
-      const y = cy + bob;
-      const bw = Math.min(188, W * 0.4);
-      const bh = 46;
-
-      ctx.fillStyle = "rgba(255,255,255,0.96)";
-      ctx.beginPath();
-      ctx.ellipse(cx - bw * 0.28, y + 4, bw * 0.22, bh * 0.42, 0, 0, Math.PI * 2);
-      ctx.ellipse(cx + bw * 0.28, y + 4, bw * 0.22, bh * 0.42, 0, 0, Math.PI * 2);
-      ctx.ellipse(cx, y - 2, bw * 0.38, bh * 0.55, 0, 0, Math.PI * 2);
-      ctx.ellipse(cx, y + 6, bw * 0.48, bh * 0.4, 0, 0, Math.PI * 2);
-      ctx.fill();
-      // 小尖角指向广场
-      ctx.beginPath();
-      ctx.moveTo(cx - 10, y + bh * 0.45);
-      ctx.lineTo(cx + 10, y + bh * 0.45);
-      ctx.lineTo(cx, y + bh * 0.45 + 12);
-      ctx.closePath();
-      ctx.fill();
-
-      ctx.fillStyle = "#2a3a4a";
-      ctx.font = `700 ${Math.max(16, W * 0.026)}px "ZCOOL KuaiLe", sans-serif`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      if (playMode === "duo" || playMode === "zhengti") ctx.fillText(q.syllable, cx, y);
-      else ctx.fillText(`${today.sm}-${q.medial}-${today.ym}`, cx, y);
-    }
-
     function updateActors(progress, t) {
       const L = layout();
       actors.forEach((a) => {
@@ -2175,22 +2139,21 @@
 
       const L = layout();
       const T = L.towers;
-      const swaySm = Math.sin(t * 1.6) * 0.08;
-      const swayJm = Math.sin(t * 1.6 + 0.7) * 0.08;
-      const swayYm = Math.sin(t * 1.6 + 1.4) * 0.08;
-      const swayZt = Math.sin(t * 1.6 + 2.1) * 0.08;
+      const waveSm = t * 2.4;
+      const waveJm = t * 2.4 + 1.1;
+      const waveYm = t * 2.4 + 2.2;
+      const waveZt = t * 2.4 + 3.3;
       const lit = night > 0.35;
 
       // 先画靠后的介母/韵母，再城墙大门，再广场，最后外侧声母/整体认读（围住广场）
-      drawTower(T.jiemu.cx, T.jiemu.baseY, T.jiemu.w, T.jiemu.h, FAMILY.jiemu.color, FAMILY.jiemu.soft, "介母", swayJm, 48, lit);
-      drawTower(T.yunmu.cx, T.yunmu.baseY, T.yunmu.w, T.yunmu.h, FAMILY.yunmu.color, FAMILY.yunmu.soft, "韵母", swayYm, 48, lit);
+      drawTower(T.jiemu.cx, T.jiemu.baseY, T.jiemu.w, T.jiemu.h, FAMILY.jiemu.color, FAMILY.jiemu.soft, "介母", waveJm, 48, lit);
+      drawTower(T.yunmu.cx, T.yunmu.baseY, T.yunmu.w, T.yunmu.h, FAMILY.yunmu.color, FAMILY.yunmu.soft, "韵母", waveYm, 48, lit);
       drawWalls(L, T);
       drawGate(L);
       drawPlaza(L.plaza.cx, L.plaza.cy, L.plaza.rw, L.plaza.rh);
-      drawTower(T.shengmu.cx, T.shengmu.baseY, T.shengmu.w, T.shengmu.h, FAMILY.shengmu.color, FAMILY.shengmu.soft, "声母", swaySm, 48, lit);
-      drawTower(T.zhengti.cx, T.zhengti.baseY, T.zhengti.w, T.zhengti.h, FAMILY.zhengti.color, FAMILY.zhengti.soft, "整体认读", swayZt, 48, lit);
+      drawTower(T.shengmu.cx, T.shengmu.baseY, T.shengmu.w, T.shengmu.h, FAMILY.shengmu.color, FAMILY.shengmu.soft, "声母", waveSm, 48, lit);
+      drawTower(T.zhengti.cx, T.zhengti.baseY, T.zhengti.w, T.zhengti.h, FAMILY.zhengti.color, FAMILY.zhengti.soft, "整体认读", waveZt, 48, lit);
 
-      drawResultBubble(L, t);
       actors.forEach((a) => drawActor(a, t));
       // 喇叭与声调条最后画，保证不被小精灵挡住
       drawHorn(L.horn.cx, L.horn.cy, L.horn.baseY);
