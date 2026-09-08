@@ -1013,6 +1013,7 @@
       a.scale = 1;
       a.alpha = 0;
       a.goingHome = false;
+      a.atHome = false;
       a.phase = "exit";
       // 介母出门后整段走在声母精灵后面（z）
       a.drawBehindSm = a.role === "jm";
@@ -1020,6 +1021,7 @@
 
     /** 走回大门：门前淡出，始终在城堡前面 */
     function startDoorEnter(a, L) {
+      if (a.atHome) return;
       if (a.walkKind === "enter" && a.walkStart != null) return;
       const door = towerDoor(a.family, L);
       a.walkKind = "enter";
@@ -1029,6 +1031,7 @@
       a.walkTo = { x: door.x, y: door.y };
       a.playing = false;
       a.goingHome = true;
+      a.atHome = false;
       a.phase = "return";
       a.behindTower = false;
       a.scale = 1;
@@ -1105,6 +1108,8 @@
           a.alpha = 0;
           a.visible = false;
           a.behindTower = false;
+          a.goingHome = false;
+          a.atHome = true; // 已进门：不再触发开合
           return true;
         }
         return false;
@@ -2332,6 +2337,9 @@
     function updateActors(progress, t) {
       const L = layout();
       actors.forEach((a) => {
+        // 已回家：门口保持闭合，不再开合
+        if (a.atHome) return;
+
         // 大门进出步行（出场 / 回家，速度与声母韵母首次出场一致）
         if (a.walkKind && a.walkStart != null) {
           const done = stepDoorWalk(a);
