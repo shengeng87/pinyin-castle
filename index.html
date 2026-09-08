@@ -2111,10 +2111,9 @@
           const arrived = Math.hypot(a.x - a.tx, a.y - a.ty) < 8;
           if (arrived && progress < 0.8) {
             a.phase = "play";
-            if (a.role === "zt") {
-              a.x = a.tx + Math.sin(t * 2.2) * 28;
-            } else if (playMode === "duo" || playMode === "trio") {
-              a.y = a.ty + Math.sin(t * 5 + (a.role === "sm" ? 0 : a.role === "ym" ? 1 : 2)) * 4;
+            if (playMode === "duo" || playMode === "trio" || playMode === "zhengti") {
+              const phase = a.role === "sm" ? 0 : a.role === "ym" ? 1 : a.role === "jm" ? 2 : 3;
+              a.y = a.ty + Math.sin(t * 5 + phase) * 4;
             }
           }
         }
