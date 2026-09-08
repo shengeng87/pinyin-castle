@@ -1633,6 +1633,44 @@
       return { x, y, visible: p > 0.02 && p < 0.95 };
     }
 
+    /** 本帧阴影参数（随太阳左右位置与高低变化） */
+    let frameShadow = { sun: null, elev: 1, night: 0 };
+
+    function updateFrameShadow(dayP, sun) {
+      frameShadow = {
+        sun,
+        elev: Math.sin(Math.PI * clamp(dayP, 0, 1)), // 0 早晚长影，1 正午短影
+        night: clamp((dayP - 0.88) / 0.12, 0, 1),
+      };
+    }
+
+    /** 地面椭圆影：偏移方向与太阳相反，早晚拉长、正午缩短 */
+    function drawGroundShadow(cx, footY, radiusX, radiusY) {
+      const { sun, elev, night } = frameShadow;
+      let ox = 0;
+      let rx = radiusX;
+      let ry = radiusY;
+      let rot = 0;
+      let a = 0.14;
+      if (sun && sun.visible && night < 0.92) {
+        const maxOff = radiusX * lerp(2.4, 0.45, elev);
+        ox = clamp(((cx - sun.x) / Math.max(W, 1)) * maxOff * 5, -maxOff, maxOff);
+        rx = radiusX * lerp(1.65, 0.92, elev);
+        ry = radiusY * lerp(0.8, 1.05, elev);
+        rot = Math.atan2(ry * 0.15, Math.abs(ox) + 8) * Math.sign(ox || 1);
+        a = 0.22 * (1 - night * 0.8) * lerp(0.7, 1, elev * 0.45 + 0.55);
+      } else {
+        // 夜晚：脚下淡淡一圈
+        a = 0.1 * (1 - night * 0.35);
+        rx *= 0.88;
+      }
+      if (a < 0.02) return;
+      ctx.fillStyle = `rgba(30, 45, 60, ${a})`;
+      ctx.beginPath();
+      ctx.ellipse(cx + ox, footY, rx, ry, rot, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
     function drawCloud(x, y, s, a) {
       ctx.save();
       ctx.globalAlpha = a;
@@ -1736,11 +1774,8 @@
       const merlonH = 18;
       const open = clamp(doorOpen == null ? 0 : doorOpen, 0, 1);
 
-      // 地基阴影
-      ctx.fillStyle = "rgba(42,58,74,0.18)";
-      ctx.beginPath();
-      ctx.ellipse(cx, baseY + 6, w * 0.58, 10, 0, 0, Math.PI * 2);
-      ctx.fill();
+      // 地基阴影（随太阳）
+      drawGroundShadow(cx, baseY + 6, w * 0.55, 10);
 
       // z 轴从后到前：顶部三角形 → 城垛 → 城堡主体
       // 1) 尖顶屋顶（略窄，底角不从城垛两侧露出）
@@ -2239,10 +2274,8 @@
       }
       ctx.globalAlpha = alpha;
 
-      ctx.fillStyle = "rgba(42,58,74,0.15)";
-      ctx.beginPath();
-      ctx.ellipse(x, a.ty + 30, bodyRx * 0.85, 8, 0, 0, Math.PI * 2);
-      ctx.fill();
+      // 脚下影子（随太阳；用当前脚底位置）
+      drawGroundShadow(x, y + bodyRy * 0.72, bodyRx * 0.9, 7);
 
       ctx.fillStyle = a.color;
       ctx.beginPath();
@@ -2426,6 +2459,7 @@
 
       const night = clamp((dayProgress - 0.88) / 0.12, 0, 1);
       const sun = sunPos(dayProgress);
+      updateFrameShadow(dayProgress, sun);
       if (sun.visible) drawSun(sun.x, sun.y);
       if (night > 0.2) drawMoon(W * 0.78, H * 0.16, night);
 
