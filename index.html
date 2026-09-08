@@ -1556,17 +1556,6 @@
       ctx.ellipse(cx, baseY + 6, w * 0.58, 10, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      // 两侧小扶壁
-      const buttW = w * 0.14;
-      const buttG = ctx.createLinearGradient(x - buttW, y, x, y);
-      buttG.addColorStop(0, soft);
-      buttG.addColorStop(1, color);
-      ctx.fillStyle = buttG;
-      roundRect(x - buttW * 0.55, y + h * 0.28, buttW, h * 0.72, 4);
-      ctx.fill();
-      roundRect(x + w - buttW * 0.45, y + h * 0.28, buttW, h * 0.72, 4);
-      ctx.fill();
-
       // 塔身渐变
       const g = ctx.createLinearGradient(x, y, x + w, y);
       g.addColorStop(0, soft);
@@ -1675,23 +1664,26 @@
       ctx.arc(cx, roofBase - roofH - 3, 4.5, 0, Math.PI * 2);
       ctx.fill();
 
-      // 雉堞画在三角形前面，盖住屋顶底边，并与塔身颜色衔接
-      const merlon = Math.max(9, w / 6.5);
-      const merlonCount = Math.floor(w / (merlon * 1.15));
+      // 城垛均匀分布在塔顶全宽
+      const merlonCount = 5;
+      const pad = 3;
+      const slot = (w - pad * 2) / merlonCount;
+      const merlonW = slot * 0.58;
+      const merlonH = 18;
       ctx.fillStyle = color;
-      roundRect(x - 2, y - 4, w + 4, 8, 2);
+      roundRect(x - 1, y - 3, w + 2, 7, 2);
       ctx.fill();
       for (let i = 0; i < merlonCount; i++) {
-        const mx = x + 4 + i * merlon * 1.15;
-        const mg = ctx.createLinearGradient(mx, y - 16, mx, y + 2);
+        const mx = x + pad + i * slot + (slot - merlonW) / 2;
+        const mg = ctx.createLinearGradient(mx, y - merlonH, mx, y + 2);
         mg.addColorStop(0, soft);
         mg.addColorStop(1, color);
         ctx.fillStyle = mg;
-        roundRect(mx, y - 16, merlon * 0.72, 20, 3);
+        roundRect(mx, y - merlonH + 2, merlonW, merlonH, 3);
         ctx.fill();
         ctx.strokeStyle = softHex(color, -0.2);
         ctx.lineWidth = 1;
-        roundRect(mx, y - 16, merlon * 0.72, 20, 3);
+        roundRect(mx, y - merlonH + 2, merlonW, merlonH, 3);
         ctx.stroke();
       }
       // 拱门
@@ -1773,47 +1765,45 @@
 
     function drawWalls(L, T) {
       const gateY = (L.gate.baseY != null ? L.gate.baseY : L.ground) - 62;
-      // 石墙带厚度感
+      // 连廊先画、端点伸进塔身内侧，随后由城堡盖住，不会压在城堡前面
+      const side = (t, dir) => ({
+        x: t.cx + dir * t.w * 0.28,
+        y: t.baseY - t.h * 0.48,
+      });
       const drawSeg = (x1, y1, x2, y2) => {
         ctx.strokeStyle = "#9a7a58";
-        ctx.lineWidth = 22;
-        ctx.lineCap = "round";
+        ctx.lineWidth = 20;
+        ctx.lineCap = "butt";
         ctx.beginPath();
         ctx.moveTo(x1, y1);
         ctx.lineTo(x2, y2);
         ctx.stroke();
         ctx.strokeStyle = "#c4a882";
-        ctx.lineWidth = 14;
+        ctx.lineWidth = 12;
         ctx.beginPath();
         ctx.moveTo(x1, y1 - 2);
         ctx.lineTo(x2, y2 - 2);
         ctx.stroke();
-        const steps = 4;
-        for (let i = 1; i < steps; i++) {
+        // 只在连廊中段加小垛，避开与城堡相接处
+        const steps = 5;
+        for (let i = 2; i < steps - 1; i++) {
           const px = lerp(x1, x2, i / steps);
           const py = lerp(y1, y2, i / steps);
           ctx.fillStyle = "#b89570";
-          roundRect(px - 5, py - 16, 10, 12, 2);
+          roundRect(px - 5, py - 14, 10, 11, 2);
           ctx.fill();
         }
       };
-      // 沿地基高度差连成环抱广场的弧形城墙
-      drawSeg(
-        T.shengmu.cx + T.shengmu.w * 0.42, T.shengmu.baseY - T.shengmu.h * 0.45,
-        T.jiemu.cx - T.jiemu.w * 0.42, T.jiemu.baseY - T.jiemu.h * 0.5
-      );
-      drawSeg(
-        T.jiemu.cx + T.jiemu.w * 0.42, T.jiemu.baseY - T.jiemu.h * 0.48,
-        L.gate.cx - 48, gateY
-      );
-      drawSeg(
-        L.gate.cx + 48, gateY,
-        T.yunmu.cx - T.yunmu.w * 0.42, T.yunmu.baseY - T.yunmu.h * 0.48
-      );
-      drawSeg(
-        T.yunmu.cx + T.yunmu.w * 0.42, T.yunmu.baseY - T.yunmu.h * 0.5,
-        T.zhengti.cx - T.zhengti.w * 0.42, T.zhengti.baseY - T.zhengti.h * 0.45
-      );
+      const smR = side(T.shengmu, 1);
+      const jmL = side(T.jiemu, -1);
+      const jmR = side(T.jiemu, 1);
+      const ymL = side(T.yunmu, -1);
+      const ymR = side(T.yunmu, 1);
+      const ztL = side(T.zhengti, -1);
+      drawSeg(smR.x, smR.y, jmL.x, jmL.y);
+      drawSeg(jmR.x, jmR.y, L.gate.cx - 48, gateY);
+      drawSeg(L.gate.cx + 48, gateY, ymL.x, ymL.y);
+      drawSeg(ymR.x, ymR.y, ztL.x, ztL.y);
     }
 
     function drawPlaza(cx, cy, rw, rh) {
@@ -2139,11 +2129,11 @@
       const waveZt = t * 2.4 + 3.3;
       const lit = night > 0.35;
 
-      // 先画靠后的介母/韵母，再城墙大门，再广场，最后外侧声母/整体认读（围住广场）
-      drawTower(T.jiemu.cx, T.jiemu.baseY, T.jiemu.w, T.jiemu.h, FAMILY.jiemu.color, FAMILY.jiemu.soft, "介母", waveJm, 48, lit);
-      drawTower(T.yunmu.cx, T.yunmu.baseY, T.yunmu.w, T.yunmu.h, FAMILY.yunmu.color, FAMILY.yunmu.soft, "韵母", waveYm, 48, lit);
+      // 连廊先画（在城堡后面），再门楼，再塔楼盖住连廊端点
       drawWalls(L, T);
       drawGate(L);
+      drawTower(T.jiemu.cx, T.jiemu.baseY, T.jiemu.w, T.jiemu.h, FAMILY.jiemu.color, FAMILY.jiemu.soft, "介母", waveJm, 48, lit);
+      drawTower(T.yunmu.cx, T.yunmu.baseY, T.yunmu.w, T.yunmu.h, FAMILY.yunmu.color, FAMILY.yunmu.soft, "韵母", waveYm, 48, lit);
       drawPlaza(L.plaza.cx, L.plaza.cy, L.plaza.rw, L.plaza.rh);
       drawTower(T.shengmu.cx, T.shengmu.baseY, T.shengmu.w, T.shengmu.h, FAMILY.shengmu.color, FAMILY.shengmu.soft, "声母", waveSm, 48, lit);
       drawTower(T.zhengti.cx, T.zhengti.baseY, T.zhengti.w, T.zhengti.h, FAMILY.zhengti.color, FAMILY.zhengti.soft, "整体认读", waveZt, 48, lit);
